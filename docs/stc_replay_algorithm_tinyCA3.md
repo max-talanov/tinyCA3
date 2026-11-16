@@ -37,6 +37,9 @@ literature leaves open.
 
 Nothing below is built. Every value is marked with its source, or as a free parameter.
 
+How it is built in NEURON (replay trigger, projections, mechanism files, stages) is in
+[implementation_plan.md](implementation_plan.md).
+
 ## 1. State variables
 
 **Table 1.** State of the circuit. *s* indexes a P1 synapse i → j, *k* a PRP pool, *m* a
