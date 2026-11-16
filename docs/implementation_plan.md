@@ -7,15 +7,16 @@ Nov 16, 2026
 This plan builds the circuit of [ca3_basic_circuit_architecture.md](ca3_basic_circuit_architecture.md)
 ("the architecture doc") in NEURON, in four layers:
 
-1. **Cells and static wiring.** 25 pyramidal cells (PYR), 25 basket cells (BC), 6 EC units, 6 DG
-   units.
+1. **Cells and static wiring.** All cells are Hodgkin–Huxley-type, conductance-based models: 25
+   pyramidal cells (PYR), 25 basket cells (BC), 6 EC cells, 6 DG cells and the replay trigger cells.
+   No integrate-and-fire or artificial cells are used.
 2. **Short-term plasticity (STP) on every synapse.** This uses the existing
    [`neuron/TMExp2SynNMDACA1_SCExc.mod`](../neuron/TMExp2SynNMDACA1_SCExc.mod), with one parameter
    set per projection.
 3. **Synaptic tagging and capture (STC) on top of STP, on the recurrent collaterals (P1) only.**
    It needs a new mechanism that adds calcium, a tag and a captured weight to the same synapse.
-4. **Replay.** A trigger starts each event. Pattern completion through P1 decides which pattern is
-   replayed. The CA3 → EC → DG → CA3 loop (P6) then reinstates it in full.
+4. **Replay.** A non-specific trigger in CA3 starts each event. Pattern completion through P1
+   decides which pattern is replayed. The CA3 → EC → DG → CA3 loop (P6) then reinstates it in full.
 
 The equations come from [stc_replay_algorithm_tinyCA3.md](stc_replay_algorithm_tinyCA3.md) ("the
 algorithm doc"). The evidence is in
@@ -47,116 +48,117 @@ decides how they are built, in which order, and how each stage is accepted.
 
 ## 1. Replay: how it is triggered
 
-### 1.1 The question
+### 1.1 Decision: replay is triggered in CA3, and CA3 picks the content
 
-How should replay start? The two candidates were:
+Each replay event starts with a brief, **non-specific** trigger that reaches all 25 PYR. The P1
+weights then decide which pattern is completed. Global inhibition suppresses the others. The P6
+loop (CA3 → EC_k → DG_k → CA3) turns that partial reactivation into the full pattern.
 
-- **(a) EC "replay cells"** with a set of sequential delays onto DG, and from there to CA3;
-- **(b) the CA3 → CA3 recurrent collaterals alone**, triggered from EC.
+This is the biologically plausible reading:
 
-### 1.2 What decides it: who picks the content
+- Sharp-wave ripples are generated in the CA3 recurrent network.
+- Their content follows what that network has stored.
+- Luboeinski & Tetzlaff 2022 measure spontaneous reactivation the same way, from background activity
+  only, with no input that names a pattern (S&A Ch. 23, p. 492).
+
+It is also the only design in which STC can decide *which* pattern is replayed:
+
+- Captured patterns win.
+- Uncaptured ones lose once their tags decay.
+
+### 1.2 Why EC cannot trigger replay through DG
 
 In the architecture doc, EC reaches CA3 only through DG. DG_k fires *every* cell of pattern k
-through detonator mossy fibres (P5), whatever the P1 weights are.
+through detonator mossy fibres (P5), whatever the P1 weights are. Any replay started by EC → DG
+would therefore be imposed: the input would name the pattern, and STC could not influence the
+content.
 
-- **Under (a)**, any replay that runs EC → DG → CA3 is *imposed*. The experimenter's choice of
-  EC_k decides which pattern is replayed, and its order.
-  - STC can still change what replay does to the synapses: replay refreshes tags and can carry
-    dopamine.
-  - STC cannot change *which* pattern is replayed. Half of the coupling we want to test, STC
-    deciding what is replayed (algorithm doc, idea 1), would be cut.
-- **Under (b)**, CA3 picks the content. A trigger that carries no pattern makes PYR fire a little.
-  P1 then completes whichever pattern has the strongest weights, and global inhibition suppresses
-  the others.
-  - Captured patterns win; uncaptured ones lose once their tags decay.
-  - This is the standard view of where sharp-wave ripples start: in the CA3 recurrent network. It
-    is also how Luboeinski & Tetzlaff 2022 measure spontaneous reactivation, from background
-    activity only (S&A Ch. 23, p. 492).
+**P1 is enough for completion.** With 25 cells connected all-to-all and global feedback inhibition,
+P1 is an attractor network. It completes a pattern from a non-specific trigger if two conditions
+hold:
 
-**Is P1 enough?** Yes. With 25 cells connected all-to-all and global feedback inhibition, P1 is an
-attractor network. It is enough to complete a pattern if two conditions hold:
-
-1. The trigger reaches CA3 without going through the detonator DG route. EC → DG → CA3 can only
-   impose a pattern.
+1. The trigger reaches CA3 directly, not through the detonator DG route.
 2. Completion has a weight threshold that the weights cross only through capture (calibration rule,
    §2.4).
 
-The architecture doc has no direct EC → CA3 path (its limit 6). So "triggered from EC" needs one
-new, *non-specific* input. That is the replay trigger population below.
+The architecture doc has no direct EC → CA3 path (its limit 6). The trigger is therefore a new
+population, `SWT` (sharp-wave trigger), described next.
 
-### 1.3 Decision: three replay modes, one default
+### 1.3 The trigger and the loop
 
-**Table 1.** Replay modes. All three keep P6 (CA3 → EC_k → DG_k → CA3), which turns a partial
-reactivation of pattern k into a full one.
+**Table 1.** Replay modes. Both keep P6, which turns a partial reactivation of pattern k into a full
+one.
 
-| Mode | Trigger | Who picks the content | Use |
+| Mode | Trigger | Who picks the content | Status |
 |---|---|---|---|
-| **R1 imposed** (your proposal) | EC replay cells `ECR_k` fire EC_k → DG_k with a set of sequential delays, e.g. Λ, then V after Δ_seq | Experimenter | Control. Tests replay → STC (tag refresh, modulation during replay) with content held fixed. Also the only mode that can replay an *ordered* sequence of patterns, which the symmetric P1 weights do not store |
-| **R2 triggered** (**default**) | A sharp-wave trigger population `SWT` (n_SWT units) projects weakly and uniformly to *all* 25 PYR. Delays are jittered over d_jit so the drive builds up over ~10–20 ms rather than arriving as one volley | P1 weights (pattern completion) | Main mode. Tests both directions of the coupling |
-| **R3 spontaneous** | None: background noise only | P1 weights | Later. Needs background firing tuned so events are rare. Compared with L&T 2022 |
+| **Triggered** (default) | `SWT`: n_SWT Hodgkin–Huxley cells that fire one short burst per event. They project weakly and uniformly to *all* 25 PYR. Delays are jittered over d_jit, so the drive builds up over ~10–20 ms rather than arriving as one volley | P1 weights (pattern completion) | Built in T7 |
+| **Spontaneous** | None: background input only | P1 weights | Later. Needs background firing tuned so events are rare. Compared with L&T 2022 |
 
 ```mermaid
 flowchart LR
-    subgraph R1["R1 imposed"]
-        ECR1(["ECR_k: sequential delays"]) --> EC1["EC_k"] --> DG1["DG_k"] -->|"MF detonator: pattern k"| CA3a["CA3: pattern k fires"]
-    end
-    subgraph R2["R2 triggered (default)"]
-        SWT(["SWT: non-specific, jittered"]) -->|"weak, to all PYR"| CA3b["CA3: P1 completes the strongest pattern"]
-        CA3b -->|"P6: ≥ θ_EC of pattern k"| EC2["EC_k"] --> DG2["DG_k"] -->|"reinstate k"| CA3b
-    end
-    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px;
-    class CA3b stc;
+    SWT(["SWT: non-specific, jittered"]) -->|"weak, to all PYR"| CA3["CA3: P1 completes the strongest pattern"]
+    CA3 -->|"P6: ≥ θ_EC of pattern k"| EC["EC_k"]
+    EC --> DG["DG_k"]
+    DG -->|"P5: reinstate pattern k"| CA3
+    CA3 -.->|"P3: inhibition of the other patterns"| CA3
+    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px,color:#000000;
+    class CA3 stc;
 ```
 
-**Figure 1.** R1 imposes the content. In R2, CA3 chooses it through the P1 weights, which carry STC
-(red). Only in R2 can STC decide what is replayed.
+**Figure 1.** Triggered replay. The trigger carries no pattern. CA3 chooses the content through the
+P1 weights, which carry STC (pink, red border).
 
-**Why R2's trigger is non-specific.** If the trigger favoured a pattern, the trigger itself would
+**Why the trigger is non-specific.** If the trigger favoured a pattern, the trigger itself would
 pick the content. SWT therefore contacts all PYR with equal weight. A null test checks this: before
-any learning, R2 events must activate each pattern about equally often (stage T7).
+any learning, triggered events must activate each pattern about equally often (stage T7).
 
-**The P6 loop.** In R2 the loop is the readout and the amplifier:
+**The P6 loop** is the readout and the amplifier:
 
 - When ≥ θ_EC of pattern k's cells fire, EC_k fires. DG_k then re-imposes the full pattern
   t_loop later.
-- t_loop is the sum of the EC → DG → CA3 delays (§2.2).
+- t_loop is the sum of the CA3 → EC → DG → CA3 delays (§2.2).
 - Because DG is a detonator, the loop makes replay all-or-none per pattern.
-- The loop gain must stay below runaway: one reinstatement per event at most (refractory window
-  t_ref,EC on EC_k).
+- The loop gain must stay below runaway: one reinstatement per event at most. EC_k has an
+  after-hyperpolarisation, or a refractory window t_ref,EC, calibrated in T3.
 
 ## 2. The tiny model
 
 ### 2.1 Populations and cell models
 
-**Table 2.** Populations. Rheobase is measured by injected DC current (CLAUDE.md of
-tinyHippo-bio-plasticity).
+**Table 2.** Populations. Every cell is a Hodgkin–Huxley-type conductance model, using the
+hippocampal channel set of Bezaire et al. 2016 (*eLife* 5:e18566), already copied to
+tinyHippo-bio-plasticity `mod/`. That repository also has `cells.build_bezaire_pyr` and
+`cells.build_bezaire_interneuron`, checked against the original templates; T1 starts from them. The
+Bezaire model runs at 34 °C, and each channel file carries its own temperature dependence. The
+built-in NEURON `hh` (squid axon, 6.3 °C) is not used, because its kinetics would have to be scaled
+far outside the temperature they were measured at. Rheobase is measured by injected DC current (CLAUDE.md of
+tinyHippo-bio-plasticity). Spike generators (NetStim) appear only as *inputs* to synapses, never as
+cells of the circuit.
 
 | Population | n | Model | Notes |
 |---|---|---|---|
 | PYR `ex_ij` | 25 | Two compartments: soma (Nav, Kdr, leak) and one dendrite where P1, P5 and SWT synapses sit | The dendrite gives NMDA a local voltage. CA3 bursting (I_CaL, I_KCa) is a later extension. Channel set from the Bezaire mechanisms in tinyHippo-bio-plasticity `mod/` |
 | BC `in_ij` | 25 | One compartment, fast-spiking (Nav, fast Kdr) | Bezaire PV basket channels |
-| EC_k | 6 | Artificial cell (`IntFire1`), or NetStim when driven | Fires on its drive, or on P6 input above θ_EC |
-| DG_k | 6 | Artificial cell | One spike per EC_k spike (detonator unit) |
-| SWT | n_SWT (e.g. 10) | NetStim burst per event | Only in R2 |
-| ECR_k | 6 | NetStim with scheduled times | Only in R1 |
-| Background | One per PYR and BC | Poisson NetStim or OU current | Tuned to ~0.2–1.5 Hz PYR firing. This keeps the offline integration valid (< 3 Hz; S&A p. 487) |
+| EC_k | 6 | One compartment, regular-spiking (Nav, Kdr, leak, plus a K_Ca or A-type current for the after-hyperpolarisation) | Fires on its encoding drive, or on P6 input from ≥ θ_EC of pattern k. The threshold is set by the P6 synaptic weight, not by a rule |
+| DG_k | 6 | One compartment, regular-spiking (same channel set) | Fires once per EC_k spike. It acts as a detonator through strong P5 synapses |
+| SWT | n_SWT (e.g. 10) | One compartment, regular-spiking | Driven by a brief current step or a NetStim burst onto an excitatory synapse at each event |
+| Encoding and background inputs | One per cell | Poisson NetStim onto `TMExp2SynNMDA` synapses, or an OU current (L&T 2021 Eq. 9) | Background tuned to ~0.2–1.5 Hz PYR firing. This keeps the offline integration valid (< 3 Hz; S&A p. 487) |
 
 ### 2.2 Projections: mechanism, STP set and STC
 
-**Table 3.** Every projection of the architecture doc, plus the two replay inputs. Only P1 carries
-STC.
+**Table 3.** Every projection of the architecture doc, plus the replay trigger input. Only P1
+carries STC.
 
 | # | Projection | Mechanism | STP set | STC | Delay | Weight set by |
 |---|---|---|---|---|---|---|
 | P1 | PYR → PYR (RC), all-to-all, 600 synapses | **`TMExp2SynNMDA_STC`** (new, §3.3) | `CA3_RC` | **Yes:** calcium, tag T, captured z, PRP pool of the postsynaptic PYR | d_RC | Calibration rule §2.4 |
 | P2 | PYR → BC, 1:1 | `TMExp2SynNMDA` (renamed copy of the existing mod) | `CA3_PYR_BC` | No | d_PB | One PYR spike gives a BC spike |
 | P3 | BC → PYR, 1:all (switch `self_inhibition`) | Same mod, gmax_nmda = 0, e = E_GABA, GABA_A kinetics | `CA3_BC_PYR` | No | d_BP | Soft k-WTA: about one pattern active |
-| P4 | EC_k → DG_k | NetCon between artificial cells | — | No | d_ED | Detonator |
+| P4 | EC_k → DG_k | `TMExp2SynNMDA` | Static placeholder (U = 1, no facilitation) | No | d_ED | One EC_k spike gives one DG_k spike |
 | P5 | DG_k → PYR of pattern k (MF) | `TMExp2SynNMDA` | `CA3_MF` | No (see §3.1) | d_MF | One DG volley fires every target, against inhibition |
-| P6 | PYR of pattern k → EC_k | NetCon, integrate-to-threshold in EC_k | — | No | d_CE | Threshold θ_EC (fraction of pattern k) |
+| P6 | PYR of pattern k → EC_k | `TMExp2SynNMDA` | Static placeholder | No | d_CE | EC_k fires only when ≥ θ_EC of pattern k fire together |
 | P7 | DA, 5-HT → PRP pools | Python, not a synapse | — | **Gates STC** | — | κ_DA, κ_5HT |
-| P8 | SWT → all PYR (new, R2) | `TMExp2SynNMDA` | `CA3_RC` (placeholder) | No | d_jit spread | Weak: alone it fires few PYR |
-| P9 | ECR_k → EC_k (new, R1) | NetCon | — | No | Sequential delays | Detonator |
+| P8 | SWT → all PYR (new) | `TMExp2SynNMDA` | `CA3_RC` (placeholder) | No | d_jit spread | Weak: alone it fires few PYR |
 
 **STP parameter sets** are named, and each value needs a source before use (CLAUDE.md):
 
@@ -180,15 +182,15 @@ flowchart LR
     PYR -->|"P2: STP"| BC["CA3 BC"]
     BC -.->|"P3 GABA_A: STP"| PYR
     PYR -->|"P6: threshold θ_EC"| EC
-    SWT(["SWT trigger (R2)"]) -->|"P8 weak, all PYR"| PYR
+    SWT(["SWT trigger"]) -->|"P8 weak, all PYR"| PYR
     POOL[("PRP pool, one per PYR")] -.->|"P_j enables capture"| PYR
     DA(["DA"]) -->|"lowers θ_pro in Λ cells"| POOL
     HT(["5-HT"]) -->|"lowers θ_pro in V cells"| POOL
-    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px;
+    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px,color:#000000;
     class PYR,POOL stc;
 ```
 
-**Figure 2.** The circuit with the STC parts in red: the P1 synapses, which carry tag and captured
+**Figure 2.** The circuit with the STC parts in pink with a red border: the P1 synapses, which carry tag and captured
 weight, and the PRP pools. The neuromodulators act only on the pools. Every other projection has
 STP only.
 
@@ -229,7 +231,7 @@ spike delivers w0·(1 + T̃ + z)·A_n.
 - **P2, P3 (inhibition): STP only.**
   - L&T 2021 found inhibitory plasticity unnecessary for memory representations (S&A p. 484).
   - The open question of STC in inhibitory neurons is listed as future work (S&A preface, p. viii).
-- **P4, P6, P8, P9: static.** They are input, readout and trigger pathways. Making them plastic would
+- **P4, P6, P8: static.** They are input, readout and trigger pathways. Making them plastic would
   let the trigger itself learn which pattern to favour.
 - **P7: gates STC** through the PRP pools. It is a scalar, not a synapse.
 
@@ -259,9 +261,9 @@ The other constants are unchanged: τ_c = 48.8 ms, t_c,delay = 18.8 ms, c_pre = 
 c_post = 0.1655, θ_p = 3, θ_d = 1.2, γ_p = 1645.6, γ_d = 313.1, τ_h = 688.4 s, τ_z = τ_P = 60 min.
 The choices k_rel ∈ {0.1, 0.265} and τ_P ∈ {60 min, 1.4–2.9 h} are made in the algorithm doc §5.
 
-These calcium constants were fitted for leaky integrate-and-fire spikes with in vivo calcium
-scaling. Stage T4 checks that they give the single-synapse protocols in this conductance-based
-cell. Whether the network needs more calcium for P1 co-activity than L&T's sparse network is
+These calcium constants were fitted with leaky integrate-and-fire spikes and in vivo calcium
+scaling. Here they are driven by Hodgkin–Huxley spikes, which can arrive as doublets or bursts. Stage
+T4 checks that they still give the single-synapse protocols in this cell. Whether the network needs more calcium for P1 co-activity than L&T's sparse network is
 **open**.
 
 ### 3.3 The new mechanism `TMExp2SynNMDA_STC`
@@ -282,11 +284,11 @@ flowchart TB
     Z --> G
     T -.->|"abs T̃ summed per PYR"| PY["Python: PRP pool Eq."]
     PY --> P
-    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px;
+    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px,color:#000000;
     class CA,T,Z,P,PY stc;
 ```
 
-**Figure 3.** One P1 synapse. The STP part (TM release, AMPA/NMDA) is unchanged. The STC part (red)
+**Figure 3.** One P1 synapse. The STP part (TM release, AMPA/NMDA) is unchanged. The STC part (pink)
 sets the factor (1 + T̃ + z) that multiplies each released quantum.
 
 **The four additions:**
@@ -359,7 +361,7 @@ flowchart LR
     end
     r1 --> r2
     z2 --> z1
-    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px;
+    classDef stc fill:#fde2e1,stroke:#c0392b,stroke-width:2px,color:#000000;
     class z1,m1,t2,p2,z2 stc;
 ```
 
@@ -370,7 +372,7 @@ flowchart LR
 - the threshold θ_EC and the refractory window t_ref,EC on EC_k;
 - the PRP-block check, which makes sure early LTP alone cannot close the loop.
 
-### 3.6 One replay event in R2
+### 3.6 One triggered replay event
 
 ```mermaid
 sequenceDiagram
@@ -410,7 +412,7 @@ gantt
     section Tags
     Tag lifetime, k_rel = 0.265 (~43 min) :t1, 00:00, 43m
     Tag lifetime, k_rel = 0.1 (~1.9 h)    :t2, 00:00, 114m
-    section Replay (R2)
+    section Triggered replay
     Epoch 1                            :r1, 00:30, 30m
     Epoch 2                            :r2, 01:30, 30m
     Epoch 3                            :r3, 03:00, 30m
@@ -434,13 +436,13 @@ results use ≥ 5 seeds and are reported per pattern.
 | Stage | Build | Acceptance |
 |---|---|---|
 | T0 Environment | Python 3.13 venv with NEURON 8.2.7; `nrnivmodl neuron/`; `params.py` with source and conditions for every value | `from neuron import h` works; existing mod compiles; 80-Hz release matches the numpy TM reference (done here once, by hand) |
-| T1 Cells | `PyrParams` + `build_pyr`, `BCParams` + `build_bc` | Rheobase by DC current, f–I curve and input resistance reported; BC fires > 100 Hz without accommodation |
+| T1 Cells | `PyrParams` + `build_pyr`, `BCParams` + `build_bc`, `RSParams` + `build_rs` (EC, DG, SWT); all Hodgkin–Huxley-type | Rheobase by DC current, f–I curve and input resistance reported per cell type; BC fires > 100 Hz without accommodation; EC/DG/SWT fire single spikes to a brief synaptic volley |
 | T2 STP sets | `STPSet` dataclass; `TMExp2SynNMDA` renamed copy; sets `CA3_RC`, `CA3_MF`, `CA3_PYR_BC`, `CA3_BC_PYR` with sources or "placeholder" | Paired-pulse ratio and 10-pulse trains at 10/20/40 Hz match each set's numpy reference to < 1% |
 | T3 Static circuit | `build_circuit(arch)` from the architecture tables; EC/DG drive; inhibition switch | (a) DG_k fires all of pattern k and only it; (b) with m_k set by hand, the calibration rule §2.4 holds: m_c ≈ 1.5; (c) baseline PYR rate 0.2–1.5 Hz |
 | T4 STC synapse | `TMExp2SynNMDA_STC` mod + numpy reference | Single-synapse and two-pathway protocols match the numpy reference to < 1% on T̃ and z; late LTP and late LTD only after strong stimulation (as in L&T 2021 Fig. 2) |
 | T5 Pools and modulators | `PRPPoolParams` + `build_prp_pools(pool=…)`; `ModulatorSchedule` + `build_modulators(da_mode=…)`; `advance_slow` | Offline integration matches the online integration of a 10-min stretch with no spikes to < 1% |
 | T6 Encoding, no replay | Patterns 1–6 with DA/5-HT; recall at 10 s and 8 h | Architecture doc Table 4: Λ and V captured, I and O back to w0; pattern 6 per pool setting |
-| T7 Replay | R1 and R2 (§1.3), `run_swr_event`, P6 loop with θ_EC and t_ref,EC | (a) Null test: before learning, R2 activates each pattern about equally often; (b) PRP block: no pattern survives 8 h despite replay; (c) no runaway (< 90% of events to one pattern unless only that pattern is captured) |
+| T7 Replay | Triggered replay (§1.3), `run_swr_event`, P6 loop with θ_EC and the EC_k after-hyperpolarisation | (a) Null test: before learning, triggered replay activates each pattern about equally often; (b) PRP block: no pattern survives 8 h despite replay; (c) no runaway (< 90% of events to one pattern unless only that pattern is captured) |
 | T8 Experiments | X1–X10 of the algorithm doc §6 | Per-pattern W_k(t), tag fraction, P_j(t), replay share and Q_k, with ≥ 5 seeds each |
 
 ## 5. Files
@@ -452,11 +454,11 @@ tinyCA3/
     TMExp2SynNMDA.mod            T2: same equations, projection-neutral name
     TMExp2SynNMDA_STC.mod        T4: + calcium, T̃, z, P
   params.py                      every value with source, species, age, [Ca²⁺]ₒ, temperature
-  cells.py                       T1: PyrParams/build_pyr, BCParams/build_bc
+  cells.py                       T1: PyrParams/build_pyr, BCParams/build_bc, RSParams/build_rs
   synapses.py                    T2/T4: STPSet, build_stp_synapse, STCParams, build_stc_synapse
   circuit.py                     T3: build_circuit(arch), patterns from the architecture doc Table 3
   stc.py                         T5: PRP pools, modulators, advance_slow (numpy)
-  replay.py                      T7: ReplayParams, run_swr_event, R1/R2 drivers
+  replay.py                      T7: ReplayParams, run_swr_event, SWT driver
   reference/                     numpy references for TM and STC
   run_*.py                       one script per stage and experiment
   RESULTS.md                     numbered sections per stage
@@ -466,12 +468,13 @@ tinyCA3/
 
 1. **CA3 STP values.** Recurrent-collateral, mossy-fibre and CA3 inhibitory STP need sources. All
    start as CA1 placeholders, except the mossy fibres, which have no values at all.
-2. **Calcium constants in a conductance-based CA3 network.** The L&T values are for LIF cells with
-   in vivo scaling. T4 tests a single synapse; T6 will show whether co-activity in a 9-cell pattern
+2. **Calcium constants in a conductance-based CA3 network.** The L&T values were fitted with LIF
+   spikes and in vivo scaling. T4 tests a single synapse; T6 will show whether co-activity in a 9-cell pattern
    over-tags.
 3. **Delays and replay timing.** The delays (d_*, t_loop), the SWT size, d_jit, the event rate and
    the epoch schedule are free. They need a primary ripple source before any timing claim.
-4. **Ordered sequences.** Symmetric P1 learning stores sets, not orders. Only R1 can replay a
-   sequence. Storing order in P1 would need an asymmetric (spike-timing) term and is out of scope.
+4. **Ordered sequences.** Symmetric P1 learning stores sets, not orders, so triggered replay
+   reinstates one pattern per event. Replaying an ordered sequence would need an asymmetric
+   (spike-timing) term in P1 and is out of scope.
 5. **5-HT.** Read from one CA2 study as an LTD-side gate (literature review §4). It stays a
    separate, switchable κ_5HT.
