@@ -1,0 +1,19 @@
+load_file("nrngui.hoc")
+objref syn, nc, ns
+create soma
+soma {L=5 diam=5 cm=1}
+celsius=34
+access soma
+insert pas
+e_pas=-65
+g_pas=3e-5
+ns= new NetStim (.5)
+ns.number=1000
+ns.start=200
+ns.interval=12.5
+ns.noise=0
+
+syn = new TMExp2SynNMDACA1_SCExc(0.5)
+
+nc = new NetCon(ns, syn, 0, 0, 0.8e-4)
+load_file("testTM.ses")
