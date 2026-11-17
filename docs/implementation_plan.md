@@ -137,11 +137,11 @@ cells of the circuit.
 
 | Population | n | Model | Notes |
 |---|---|---|---|
-| PYR `ex_ij` | 25 | Two compartments: soma (Nav, Kdr, leak) and one dendrite where P1, P5 and SWT synapses sit | The dendrite gives NMDA a local voltage. CA3 bursting (I_CaL, I_KCa) is a later extension. Channel set from the Bezaire mechanisms in tinyHippo-bio-plasticity `mod/` |
-| BC `in_ij` | 25 | One compartment, fast-spiking (Nav, fast Kdr) | Bezaire PV basket channels |
-| EC_k | 6 | One compartment, regular-spiking (Nav, Kdr, leak, plus a K_Ca or A-type current for the after-hyperpolarisation) | Fires on its encoding drive, or on P6 input from ≥ θ_EC of pattern k. The threshold is set by the P6 synaptic weight, not by a rule |
-| DG_k | 6 | One compartment, regular-spiking (same channel set) | Fires once per EC_k spike. It acts as a detonator through strong P5 synapses |
-| SWT | n_SWT (e.g. 10) | One compartment, regular-spiking | Driven by a brief current step or a NetStim burst onto an excitatory synapse at each event |
+| PYR `ex_ij` | 25 | Three compartments (built in T1): soma and one apical dendrite with Navp, Kdrp, KvAproxp, HCNp and leak, plus an axon initial segment with Navaxonp, as in the Bezaire template. Densities are the template's somatic values | The dendrite gives NMDA a local voltage; P1, P5 and SWT synapses sit on it. The axon segment is where the Bezaire cell initiates spikes. CA3 bursting (I_CaL, I_KCa) is a later extension |
+| BC `in_ij` | 25 | The published Bezaire PV basket cell (17 sections, seven channel types), ported and checked against its template in T1 | Fast-spiking: > 100 Hz with little accommodation |
+| EC_k | 6 | One compartment with the pyramidal somatic channels (Navp, Kdrp, KvAproxp, leak) | Fires on its encoding drive, or on P6 input from ≥ θ_EC of pattern k. The threshold is set by the P6 synaptic weight, not by a rule. Its inputs are AMPA-only (T1: with NMDA one event fires a train) |
+| DG_k | 6 | One compartment, same channel set | Fires once per EC_k spike through an AMPA-only P4 synapse. It acts as a detonator through strong P5 synapses |
+| SWT | n_SWT (e.g. 10) | One compartment, same channel set | Driven by a NetStim burst onto an AMPA-only synapse at each event |
 | Encoding and background inputs | One per cell | Poisson NetStim onto `TMExp2SynNMDA` synapses, or an OU current (L&T 2021 Eq. 9) | Background tuned to ~0.2–1.5 Hz PYR firing. This keeps the offline integration valid (< 3 Hz; S&A p. 487) |
 
 ### 2.2 Projections: mechanism, STP set and STC
@@ -154,9 +154,9 @@ carries STC.
 | P1 | PYR → PYR (RC), all-to-all, 600 synapses | **`TMExp2SynNMDA_STC`** (new, §3.3) | `CA3_RC` | **Yes:** calcium, tag T, captured z, PRP pool of the postsynaptic PYR | d_RC | Calibration rule §2.4 |
 | P2 | PYR → BC, 1:1 | `TMExp2SynNMDA` (renamed copy of the existing mod) | `CA3_PYR_BC` | No | d_PB | One PYR spike gives a BC spike |
 | P3 | BC → PYR, 1:all (switch `self_inhibition`) | Same mod, gmax_nmda = 0, e = E_GABA, GABA_A kinetics | `CA3_BC_PYR` | No | d_BP | Soft k-WTA: about one pattern active |
-| P4 | EC_k → DG_k | `TMExp2SynNMDA` | Static placeholder (U = 1, no facilitation) | No | d_ED | One EC_k spike gives one DG_k spike |
+| P4 | EC_k → DG_k | `TMExp2SynNMDA`, AMPA only (gmax_nmda = 0) | Static placeholder (U = 1, no facilitation) | No | d_ED | One EC_k spike gives one DG_k spike (T1: one spike for weights 0.003–0.016) |
 | P5 | DG_k → PYR of pattern k (MF) | `TMExp2SynNMDA` | `CA3_MF` | No (see §3.1) | d_MF | One DG volley fires every target, against inhibition |
-| P6 | PYR of pattern k → EC_k | `TMExp2SynNMDA` | Static placeholder | No | d_CE | EC_k fires only when ≥ θ_EC of pattern k fire together |
+| P6 | PYR of pattern k → EC_k | `TMExp2SynNMDA`, AMPA only | Static placeholder | No | d_CE | EC_k fires only when ≥ θ_EC of pattern k fire together |
 | P7 | DA, 5-HT → PRP pools | Python, not a synapse | — | **Gates STC** | — | κ_DA, κ_5HT |
 | P8 | SWT → all PYR (new) | `TMExp2SynNMDA` | `CA3_RC` (placeholder) | No | d_jit spread | Weak: alone it fires few PYR |
 
@@ -435,8 +435,8 @@ results use ≥ 5 seeds and are reported per pattern.
 
 | Stage | Build | Acceptance |
 |---|---|---|
-| T0 Environment | Python 3.13 venv with NEURON 8.2.7; `nrnivmodl neuron/`; `params.py` with source and conditions for every value | `from neuron import h` works; existing mod compiles; 80-Hz release matches the numpy TM reference (done here once, by hand) |
-| T1 Cells | `PyrParams` + `build_pyr`, `BCParams` + `build_bc`, `RSParams` + `build_rs` (EC, DG, SWT); all Hodgkin–Huxley-type | Rheobase by DC current, f–I curve and input resistance reported per cell type; BC fires > 100 Hz without accommodation; EC/DG/SWT fire single spikes to a brief synaptic volley |
+| T0 Environment | Python 3.13 venv with pip `neuron==9.0.2` (PYTHONPATH unset); `nrn_setup.load_mechanisms` compiles `neuron/`; `params.py` with source and conditions for every value | `from neuron import h` works; all mechanisms load; TM release at 10–80 Hz matches the numpy reference to 1e-9 (**done**, RESULTS.md §1) |
+| T1 Cells (**done**, RESULTS.md §2) | `PyrParams` + `build_pyr`, `BCParams` + `build_bc`, `RSParams` + `build_rs` (EC, DG, SWT); all Hodgkin–Huxley-type | Rheobase by DC current, f–I curve and input resistance reported per cell type; BC fires > 100 Hz without accommodation; EC/DG/SWT fire single spikes to a brief synaptic volley |
 | T2 STP sets | `STPSet` dataclass; `TMExp2SynNMDA` renamed copy; sets `CA3_RC`, `CA3_MF`, `CA3_PYR_BC`, `CA3_BC_PYR` with sources or "placeholder" | Paired-pulse ratio and 10-pulse trains at 10/20/40 Hz match each set's numpy reference to < 1% |
 | T3 Static circuit | `build_circuit(arch)` from the architecture tables; EC/DG drive; inhibition switch | (a) DG_k fires all of pattern k and only it; (b) with m_k set by hand, the calibration rule §2.4 holds: m_c ≈ 1.5; (c) baseline PYR rate 0.2–1.5 Hz |
 | T4 STC synapse | `TMExp2SynNMDA_STC` mod + numpy reference | Single-synapse and two-pathway protocols match the numpy reference to < 1% on T̃ and z; late LTP and late LTD only after strong stimulation (as in L&T 2021 Fig. 2) |

@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# NEURON build output
+neuron/arm64/
+neuron/x86_64/
+
