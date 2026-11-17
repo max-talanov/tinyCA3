@@ -428,7 +428,9 @@ not sourced values.
 
 ## 4. Stages
 
-Each stage ends in an acceptance criterion and a numbered section in `RESULTS.md`. Stochastic
+A single-seed pilot of T2–T7 (RESULTS.md §3) runs the whole loop with hand-calibrated weights; only T0, T1 and the
+T4 synapse check are accepted so far. Each stage ends in an acceptance criterion and a numbered section in
+[RESULTS.md](RESULTS.md). Stochastic
 results use ≥ 5 seeds and are reported per pattern.
 
 **Table 4.** Implementation stages.
@@ -461,7 +463,7 @@ tinyCA3/
   replay.py                      T7: ReplayParams, run_swr_event, SWT driver
   reference/                     numpy references for TM and STC
   run_*.py                       one script per stage and experiment
-  RESULTS.md                     numbered sections per stage
+  docs/RESULTS.md                numbered sections per stage, numbered figures with captions
 ```
 
 ## 6. Open points

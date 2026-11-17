@@ -7,7 +7,7 @@ plasticity on every synapse and replay through the CA3 → EC → DG → CA3 loo
 - Implementation plan and stages: [docs/implementation_plan.md](docs/implementation_plan.md)
 - STC and replay algorithm: [docs/stc_replay_algorithm_tinyCA3.md](docs/stc_replay_algorithm_tinyCA3.md)
 - Literature: [docs/synaptic_tagging_literature_review.md](docs/synaptic_tagging_literature_review.md)
-- Results per stage: [RESULTS.md](RESULTS.md)
+- Results per stage: [docs/RESULTS.md](docs/RESULTS.md)
 
 ## Setup
 
@@ -32,9 +32,12 @@ The mechanisms in `neuron/` are compiled on first use by `nrn_setup.load_mechani
 
 | Path | Content |
 |---|---|
-| `neuron/` | NMODL: the Tsodyks–Markram AMPA/NMDA synapse and the Bezaire et al. 2016 channels (`BEZAIRE_CHANNELS.md`) |
+| `neuron/` | NMODL: the Tsodyks–Markram AMPA/NMDA synapse, its STC version `TMExp2SynNMDA_STC.mod`, and the Bezaire et al. 2016 channels (`BEZAIRE_CHANNELS.md`) |
 | `reference/` | Numpy references (`tm_numpy.py`) and the original Bezaire templates used to check the ports |
 | `params.py` | Every value with source, status and recording conditions |
 | `cells.py` | T1: Hodgkin–Huxley-type cells: `build_pyr`, `build_bc`, `build_rs`; DC measurements |
 | `run_t1_cells.py` | T1 measurements → `results/t1_cells.json`, `results/t1_fI.png` |
+| `circuit.py` | Pilot circuit: all projections P1–P8, patterns, online blocks |
+| `stc.py` | PRP pools, DA/5-HT schedules, offline integration of tags and captured weights |
+| `run_pilot.py`, `make_figures.py` | 8-h pilot (`results/pilot.npz`; the 81-MB `pilot_events.pkl` is not committed) and Figures 2–6 |
 | `tests/` | One test file per stage |

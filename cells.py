@@ -131,6 +131,7 @@ class BCParams:
     na_scale: float = 1.0
     k_scale: float = 1.0
     leak_scale: float = 1.0
+    compact: bool = False   # True: one segment per section (network use, ~3x faster); False: Bezaire's d_lambda nseg
 
 
 def _bez_nseg(L, diam):
@@ -153,7 +154,7 @@ def build_bc(p: BCParams = BCParams(), name="bc"):
     scale = dict(Na=p.na_scale, Kdr=p.k_scale)
     eca = 8.314 * (273.15 + CELSIUS) / (2 * 9.649e4) * math.log(_CA_OUT / _CA_IN) * 1000
     for sec in secs.values():
-        sec.nseg = _bez_nseg(sec.L, sec.diam)
+        sec.nseg = 1 if p.compact else _bez_nseg(sec.L, sec.diam)
         sec.Ra, sec.cm = _PV["Ra"], _PV["cm"]
         for key, (mech, g) in _PV_CH.items():
             sec.insert(mech)
