@@ -48,6 +48,7 @@ def main():
     for vec, (_, _, s) in zip(tt_rec, circ.p1):
         vec.record(s._ref_Tt, 5.0)
     t0 = time.time()
+    circ.set_state(replay=False)                        # encoding state
     enc = circ.run_block(t_enc_ms, Tt, z, P, block=0)
     circ.clear_schedules()
     print(f"encoding block {t_enc_ms / 1000:.1f} s simulated in {time.time() - t0:.0f} s", flush=True)
@@ -81,7 +82,8 @@ def main():
         t_s = ev_t
         if ev_t >= T_END_S:
             break
-        circ.schedule_swr(SWR_AT_MS)
+        circ.set_state(replay=True)                     # replay state
+        circ.schedule_swr(SWR_AT_MS, event=block)
         r = circ.run_block(EVENT_MS, Tt, z, P, block=block)
         circ.clear_schedules()
         block += 1

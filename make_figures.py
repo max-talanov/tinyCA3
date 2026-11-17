@@ -1,6 +1,6 @@
 """Figures of the pilot run (results/pilot.npz, results/pilot_events.pkl) -> results/fig_pilot_*.png.
 
-Numbering continues docs/RESULTS.md (Figure 1 is the T1 f-I curve):
+Numbering continues docs/RESULTS_2026-11-17.md (Figure 1 is the T1 f-I curve):
   Figure 2  encoding block: patterns and modulators, spikes and population potentials by cell type, tags
   Figure 3  replay events: four SWR events at close range
   Figure 4  the 8-h dynamics: DA/5-HT, SWR events and replays; tags, captured weights, total weights, PRP pools
@@ -20,10 +20,18 @@ import numpy as np  # noqa: E402
 from circuit import CELL_IDS, IDX, PATTERN_ORDER, PATTERNS  # noqa: E402
 
 RES = Path(__file__).resolve().parent / "results"
+BURST = 23   # events with >= 23 of 25 PYR active are whole-network bursts, not pattern replays
 PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 TCOL = {"PYR": "#d35400", "BC": "#1f5fbf", "EC": "#16a085", "DG": "#8e44ad", "SWT": "#555555"}
 DA_COL, HT_COL = "#c0392b", "#2e6fd8"
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
+
+
+def _letters(axes, x=-0.02, y=1.0):
+    """Panel indexes (a), (b), ... at the top-left of each axes, in reading order."""
+    for i, ax in enumerate(axes):
+        ax.text(x, y, f"({chr(97 + i)})", transform=ax.transAxes, fontsize=9, fontweight="bold",
+                ha="right", va="bottom")
 
 
 def _load():
@@ -50,7 +58,8 @@ def _raster(ax, spikes, t_scale=1.0, xlim=None):
             if typ == "PYR":
                 member = [p for p in ("Λ", "V", "I", "O") if k in PATTERNS[p]]
                 col = PCOL[member[0]] if member else TCOL["PYR"]
-            ax.plot(st * t_scale, np.full(len(st), row), "|", color=col, ms=2.5, mew=0.6)
+            big = typ in ("EC", "DG", "SWT")
+            ax.plot(st * t_scale, np.full(len(st), row), "|", color=col, ms=5.0 if big else 2.5, mew=1.4 if big else 0.6)
             row += 1
         ticks.append((start + row - 1) / 2)
         labels.append(typ)
@@ -99,6 +108,7 @@ def fig_encoding(e):
     axes[6].set_ylabel("mean T̃\n(tag)")
     axes[6].legend(ncol=6, frameon=False, fontsize=7, loc="lower right")
     axes[6].set_xlabel("time (s)")
+    _letters(axes)
     fig.align_ylabels(axes)
     fig.tight_layout()
     fig.savefig(RES / "fig_pilot_2_encoding.png", dpi=150)
@@ -133,6 +143,7 @@ def fig_replay_events(e):
             for ax in axes[:, j]:
                 ax.set_ylabel("")
                 ax.set_yticklabels([])
+    _letters(axes[0, :], x=-0.02, y=1.18)
     fig.tight_layout()
     fig.savefig(RES / "fig_pilot_3_replay_events.png", dpi=150)
     plt.close(fig)
@@ -148,22 +159,27 @@ def fig_overview(d, e):
         a, b = p["t_on_s"] / 3600, (p["t_on_s"] + p["dur_s"]) / 3600
         ax.plot([a, b], [y, y], color=col, lw=4, solid_capstyle="butt")
         ax.text(a - 0.05, y, glyph, color=col, va="center", ha="right", fontsize=12, fontweight="bold")
-        ax.text(b + 0.05, y, f"{p['source']} release onto {glyph} cells", color=col, va="center", fontsize=7)
+        ax.text(7.95, y, f"{glyph}: {p['source']} release onto {glyph} cells, {a:.0f}–{b:.0f} h", color=col,
+                va="center", ha="right", fontsize=7)
     ax.text(0.0, 2.85, "encoding at 0 h: " + "  ".join(PATTERN_ORDER), fontsize=7, va="center")
     for ep in (0.5, 1.5, 3.0, 6.0):
         for a_ in axes:
             a_.axvspan(ep, ep + 0.5, color="#f0e6c8", alpha=0.6, lw=0)
     for ev in e["events"]:
         x = ev["t_s"] / 3600
-        if ev["replayed"]:
-            k = ev["replayed"][0]
-            ax.plot([x, x], [0.2, 1.1], color=PCOL[k], lw=0.9)
-            label = k if len(ev["replayed"]) == 1 else f"{k}+{len(ev['replayed']) - 1}"
-            n_prev = sum(1 for o in e["events"] if o["replayed"] and 0 < x - o["t_s"] / 3600 < 0.3)
-            ax.text(x, 1.15 + 0.3 * n_prev, label, color=PCOL[k], fontsize=8, ha="center", va="bottom",
-                    fontweight="bold")
+        if ev["n_active"] >= BURST:
+            ax.plot([x, x], [0.2, 1.1], color="k", lw=0.9)
+        elif ev["replayed"]:
+            k = max(ev["replayed"], key=lambda q: len(PATTERNS[q]))     # largest pattern read out
+            ax.plot([x, x], [0.2, 1.1], color=PCOL[k], lw=1.2)
         else:
             ax.plot([x, x], [0.2, 0.6], color="#999999", lw=0.6)
+    from matplotlib.lines import Line2D
+    handles = [Line2D([], [], color=PCOL[k], lw=2, label=k) for k in PATTERN_ORDER]
+    handles.append(Line2D([], [], color="k", lw=2, label="all 25 (burst)"))
+    ax.legend(handles=handles, ncol=7, frameon=False, fontsize=7, loc="lower right", bbox_to_anchor=(1.0, 0.18),
+              title="replay read out as (largest pattern ≥ 80% active):", title_fontsize=7, handlelength=1.0,
+              columnspacing=0.8)
     ax.set_ylim(0, 3.1)
     ax.set_yticks([0.6, 1.95], ["SWR events", "modulators"])
     for k in PATTERN_ORDER:
@@ -182,12 +198,15 @@ def fig_overview(d, e):
               "I only": set(PATTERNS["I"]) - set(PATTERNS["Λ∪V"]),
               "O only": set(PATTERNS["O"]) - set(PATTERNS["Λ∪V"])}
     gcol = {"Λ cells (DA)": PCOL["Λ"], "V cells (5-HT)": PCOL["V"], "I only": PCOL["I"], "O only": PCOL["O"]}
+    gsty = {"Λ cells (DA)": dict(lw=3.0, ls="-", alpha=0.5), "V cells (5-HT)": dict(lw=1.2, ls="--"),
+            "I only": dict(lw=3.0, ls="-", alpha=0.5), "O only": dict(lw=1.2, ls="--")}
     for g, cells in groups.items():
-        axes[4].plot(th, P[:, [IDX[c] for c in cells]].mean(axis=1), color=gcol[g], lw=1, label=g)
+        axes[4].plot(th, P[:, [IDX[c] for c in cells]].mean(axis=1), color=gcol[g], label=g, **gsty[g])
     axes[4].set_ylabel("PRP pool P")
     axes[4].legend(frameon=False, fontsize=7)
     axes[4].set_xlabel("time after encoding (h)")
     axes[4].set_xlim(-0.1, 8.0)
+    _letters(axes)
     fig.align_ylabels(axes)
     fig.tight_layout()
     fig.savefig(RES / "fig_pilot_4_overview.png", dpi=150)
@@ -204,18 +223,23 @@ def fig_weights(d, e):
         W = np.full((25, 25), np.nan)
         for s, (a, b) in enumerate(zip(d["p1_pre"], d["p1_post"])):
             W[pos[CELL_IDS[b]], pos[CELL_IDS[a]]] = 1 + w[s]
-        im = ax.imshow(W, cmap="magma", vmin=0.5, vmax=2.4)
-        ax.set_title(f"{label} (t = {t_s / 3600:.2f} h)", fontsize=8, pad=16)
+        im = ax.imshow(W, cmap="magma", vmin=0.9, vmax=1.7)
+        ax.set_title(f"t = {t_s / 3600:.2f} h", fontsize=8, pad=16)
         ax.set_xlabel("presynaptic cell")
         ax.set_ylabel("postsynaptic cell")
         start = 0
         for k in ("Λ", "V", "I", "O"):
             n_new = len([c for c in PATTERNS[k] if pos[c] >= start])
             ax.add_patch(plt.Rectangle((start - 0.5, start - 0.5), n_new, n_new, fill=False, ec=PCOL[k], lw=1.2))
+            blk = W[start:start + n_new, start:start + n_new]
+            ax.text(start + n_new - 1.0, start + 0.3, f"{np.nanmean(blk):.2f}", color="w",
+                    ha="right", va="top", fontsize=7, fontweight="bold",
+                    bbox=dict(boxstyle="round,pad=0.1", fc="k", ec="none", alpha=0.5))
             ax.text(start + n_new / 2, -1.2, k, color=PCOL[k], ha="center", fontsize=9, fontweight="bold")
             start += n_new
         ax.set_xticks([])
         ax.set_yticks([])
+    _letters(axes, x=-0.08, y=1.12)
     fig.colorbar(im, ax=axes, shrink=0.8, label="weight multiplier 1 + T̃ + z")
     fig.savefig(RES / "fig_pilot_5_weights.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -224,18 +248,21 @@ def fig_weights(d, e):
 def fig_replay_share(e):
     epochs = (0.5, 1.5, 3.0, 6.0)
     share = np.zeros((len(epochs), len(PATTERN_ORDER)))
+    bursts = []
     for i, ep in enumerate(epochs):
         evs = [x for x in e["events"] if ep * 3600 <= x["t_s"] < ep * 3600 + 1800]
         for j, k in enumerate(PATTERN_ORDER):
-            share[i, j] = np.mean([k in x["replayed"] for x in evs]) if evs else 0
+            share[i, j] = np.mean([k in x["replayed"] and x["n_active"] < BURST for x in evs]) if evs else 0
+        bursts.append(np.mean([x["n_active"] >= BURST for x in evs]) if evs else 0)
     fig, ax = plt.subplots(figsize=(6.0, 2.8))
     w = 0.13
     for j, k in enumerate(PATTERN_ORDER):
         ax.bar(np.arange(len(epochs)) + (j - 2.5) * w, share[:, j], w, color=PCOL[k], label=k)
+    ax.bar(np.arange(len(epochs)) + 3.5 * w, bursts, w, color="k", label="all (burst)")
     ax.set_xticks(range(len(epochs)), [f"{ep:g}–{ep + 0.5:g} h" for ep in epochs])
     ax.set_ylabel("fraction of SWR events\nreplaying the pattern")
     ax.set_xlabel("replay epoch")
-    ax.legend(ncol=6, frameon=False, fontsize=7, loc="upper right")
+    ax.legend(ncol=7, frameon=False, fontsize=7, loc="upper center", bbox_to_anchor=(0.5, 1.18))
     fig.tight_layout()
     fig.savefig(RES / "fig_pilot_6_replay_share.png", dpi=150)
     plt.close(fig)

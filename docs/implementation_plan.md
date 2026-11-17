@@ -428,17 +428,17 @@ not sourced values.
 
 ## 4. Stages
 
-A single-seed pilot of T2–T7 (RESULTS.md §3) runs the whole loop with hand-calibrated weights; only T0, T1 and the
+A single-seed pilot of T2–T7 (RESULTS_2026-11-17.md §3) runs the whole loop with hand-calibrated weights; only T0, T1 and the
 T4 synapse check are accepted so far. Each stage ends in an acceptance criterion and a numbered section in
-[RESULTS.md](RESULTS.md). Stochastic
+[RESULTS_2026-11-17.md](RESULTS_2026-11-17.md). Stochastic
 results use ≥ 5 seeds and are reported per pattern.
 
 **Table 4.** Implementation stages.
 
 | Stage | Build | Acceptance |
 |---|---|---|
-| T0 Environment | Python 3.13 venv with pip `neuron==9.0.2` (PYTHONPATH unset); `nrn_setup.load_mechanisms` compiles `neuron/`; `params.py` with source and conditions for every value | `from neuron import h` works; all mechanisms load; TM release at 10–80 Hz matches the numpy reference to 1e-9 (**done**, RESULTS.md §1) |
-| T1 Cells (**done**, RESULTS.md §2) | `PyrParams` + `build_pyr`, `BCParams` + `build_bc`, `RSParams` + `build_rs` (EC, DG, SWT); all Hodgkin–Huxley-type | Rheobase by DC current, f–I curve and input resistance reported per cell type; BC fires > 100 Hz without accommodation; EC/DG/SWT fire single spikes to a brief synaptic volley |
+| T0 Environment | Python 3.13 venv with pip `neuron==9.0.2` (PYTHONPATH unset); `nrn_setup.load_mechanisms` compiles `neuron/`; `params.py` with source and conditions for every value | `from neuron import h` works; all mechanisms load; TM release at 10–80 Hz matches the numpy reference to 1e-9 (**done**, RESULTS_2026-11-17.md §1) |
+| T1 Cells (**done**, RESULTS_2026-11-17.md §2) | `PyrParams` + `build_pyr`, `BCParams` + `build_bc`, `RSParams` + `build_rs` (EC, DG, SWT); all Hodgkin–Huxley-type | Rheobase by DC current, f–I curve and input resistance reported per cell type; BC fires > 100 Hz without accommodation; EC/DG/SWT fire single spikes to a brief synaptic volley |
 | T2 STP sets | `STPSet` dataclass; `TMExp2SynNMDA` renamed copy; sets `CA3_RC`, `CA3_MF`, `CA3_PYR_BC`, `CA3_BC_PYR` with sources or "placeholder" | Paired-pulse ratio and 10-pulse trains at 10/20/40 Hz match each set's numpy reference to < 1% |
 | T3 Static circuit | `build_circuit(arch)` from the architecture tables; EC/DG drive; inhibition switch | (a) DG_k fires all of pattern k and only it; (b) with m_k set by hand, the calibration rule §2.4 holds: m_c ≈ 1.5; (c) baseline PYR rate 0.2–1.5 Hz |
 | T4 STC synapse | `TMExp2SynNMDA_STC` mod + numpy reference | Single-synapse and two-pathway protocols match the numpy reference to < 1% on T̃ and z; late LTP and late LTD only after strong stimulation (as in L&T 2021 Fig. 2) |
@@ -463,7 +463,7 @@ tinyCA3/
   replay.py                      T7: ReplayParams, run_swr_event, SWT driver
   reference/                     numpy references for TM and STC
   run_*.py                       one script per stage and experiment
-  docs/RESULTS.md                numbered sections per stage, numbered figures with captions
+  docs/RESULTS_2026-11-17.md                numbered sections per stage, numbered figures with captions
 ```
 
 ## 6. Open points

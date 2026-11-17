@@ -44,9 +44,11 @@ class CircuitParams:
     mf_nmda: bool = False         # P5 NMDA component (True gives seconds of reverberation after encoding)
     p1_gmax_nmda: float = 0.3     # P1 NMDA/AMPA conductance ratio, a quarter of the CA1 value 1.23 (limits reverberation)
     w_ce_total: float = 0.00268   # P6, divided over the cells of the pattern: EC fires at ~90% (threshold 0.00236)
-    w_swt: float = 0.0016         # P8, per synapse; 10 jittered inputs fire a quiet PYR at 0.00175
+    w_swt: float = 0.006          # P8, per synapse (sparse, p8_prob): one event seeds ~3-8 random PYR
     n_swt: int = 10
     swt_jitter: float = 15.0      # ms, delays uniform in [1, 1 + jitter]
+    p8_prob: float = 0.3          # P8 connection probability SWT -> PYR (sparse, so each event seeds a few random cells)
+    swt_active: int = 4           # SWT cells that fire in one event, drawn at random per event
     d_rc: float = 1.5             # ms, all delays are placeholders
     d_pb: float = 1.0
     d_bp: float = 1.0
@@ -58,7 +60,9 @@ class CircuitParams:
     w_drive: float = 0.008        # encoding drive NetStim -> EC_k
     k_rel: float = 0.1            # tag decay of L&T 2021 (~1.9 h); 0.265 = Frey & Morris 1998 half-life ~30 min
     c_pre: float = 1.0            # L&T 2021 Table 2 slice values (Graupner & Brunel 2012 fit); the 0.6x network
-    c_post: float = 0.2758        # values never reach theta_p with these HH cells (pilot calibration, RESULTS 3)
+    c_post: float = 0.2758        # values never reach theta_p with these HH cells (pilot calibration, RESULTS_2026-11-17.md section 3)
+    replay_inh_scale: float = 2.0  # P3 scale in replay blocks (brain-state switch, free; report section 4)
+    replay_p1_scale: float = 2.5   # P1 scale in replay blocks (release from cholinergic suppression; free)
     pyr_k_scale: float = 2.0      # Kdr x2: lets PYR follow 100 Hz mossy-fibre input (x1 follows 2 of 10 spikes)
     seed: int = 1
 
@@ -74,6 +78,8 @@ class Circuit:
         self.swt = [build_rs(name=f"SWT_{i}") for i in range(p.n_swt)]
         self.keep = []
         self.enc_stims = []
+        self.p3 = []
+        self.p1_nc = []
         self._wire()
         self._record()
 
@@ -106,7 +112,7 @@ class Circuit:
                     continue
                 s = h.TMExp2SynNMDA_STC(dend(0.5))
                 s.k_rel, s.c_pre, s.c_post, s.gmax_nmda = p.k_rel, p.c_pre, p.c_post, p.p1_gmax_nmda
-                self._nc(self.pyr[pre]["soma"], s, p.w0, p.d_rc)
+                self.p1_nc.append(self._nc(self.pyr[pre]["soma"], s, p.w0, p.d_rc))
                 self._nc(self.pyr[post]["soma"], s, -1.0, 0.0)      # postsynaptic spike -> calcium
                 self.p1.append((pre, post, s))
         self.p1_pre = np.array([IDX[a] for a, _, _ in self.p1])
@@ -116,19 +122,24 @@ class Circuit:
             self._nc(self.pyr[cid]["soma"], self._syn(self.bc[cid]["soma"], 0.5, nmda=False), p.w_pb, p.d_pb)
             for tgt in CELL_IDS:
                 if tgt != cid:
-                    self._nc(self.bc[cid]["soma"], self._syn(self.pyr[tgt]["soma"], 0.5, gaba=True), p.w_bp, p.d_bp)
+                    self.p3.append(self._nc(self.bc[cid]["soma"], self._syn(self.pyr[tgt]["soma"], 0.5, gaba=True),
+                                            p.w_bp, p.d_bp))
         # P4, P5, P6
         for k, cells in PATTERNS.items():
             self._nc(self.ec[k]["soma"], self._syn(self.dg[k]["soma"], 0.5, nmda=False), p.w_ed, p.d_ed)
-            ec_syn = self._syn(self.ec[k]["soma"], 0.5, nmda=False, stp=(0.9, 1.0, 1500.0))
             for cid in cells:
                 self._nc(self.dg[k]["soma"], self._syn(self.pyr[cid]["dend"], 0.05, nmda=p.mf_nmda), p.w_mf, p.d_mf)
+                # one synapse per connection: a shared TM synapse would let the first spike deplete it for all cells
+                ec_syn = self._syn(self.ec[k]["soma"], 0.5, nmda=False, stp=(0.9, 1.0, 1500.0))
                 self._nc(self.pyr[cid]["soma"], ec_syn, p.w_ce_total / len(cells), p.d_ce)
-        # P8 trigger: one synapse per PYR, each trigger cell contacts it with its own jittered delay
+        # P8 trigger: sparse (p8_prob), one synapse per (trigger cell, PYR) pair, each with its own jittered delay.
+        # A dense, uniform trigger onto identical cells fires all 25 PYR at once or none (calibration, report section 4).
+        self.p8 = []
         for cid in CELL_IDS:
-            s = self._syn(self.pyr[cid]["dend"], 0.5, nmda=False)
-            for sw in self.swt:
-                self._nc(sw["soma"], s, p.w_swt, 1.0 + self.rng.uniform(0, p.swt_jitter))
+            for j, sw in enumerate(self.swt):
+                if self.rng.random() < p.p8_prob:
+                    s = self._syn(self.pyr[cid]["dend"], 0.5, nmda=False)
+                    self.p8.append(self._nc(sw["soma"], s, p.w_swt, 1.0 + self.rng.uniform(0, p.swt_jitter)))
         # drives (NetStims are inputs only): EC encoding drive, SWT burst, PYR background
         self.ec_drive = {}
         for k in PATTERN_ORDER:
@@ -200,9 +211,26 @@ class Circuit:
             self.enc_stims.append(ns)
         self.keep += stims
 
-    def schedule_swr(self, t_on, n_spikes=1):
-        for ns in self.swt_drive:
-            ns.start, ns.number, ns.interval, ns.noise = t_on, n_spikes, 5.0, 0
+    def set_state(self, replay: bool):
+        """Brain state. Encoding: P1 transmission w0, P3 w_bp (the calibrated encoding values). Replay: P1 x
+        replay_p1_scale (recurrent collaterals released from the cholinergic suppression they are under during
+        encoding; Hasselmo et al. 1995, unverified) and P3 x replay_inh_scale. Learning is in units of w0, so the
+        stored T and z are not changed by the switch."""
+        for nc in self.p1_nc:
+            nc.weight[0] = self.p.w0 * (self.p.replay_p1_scale if replay else 1.0)
+        self.set_inhibition_scale(self.p.replay_inh_scale if replay else 1.0)
+
+    def set_inhibition_scale(self, scale):
+        """Brain-state switch: P3 (BC -> PYR) weight = scale * w_bp. 1 during encoding; the replay state uses
+        CircuitParams.replay_inh_scale (strong basket-cell inhibition during sharp-wave ripples; status free)."""
+        for nc in self.p3:
+            nc.weight[0] = scale * self.p.w_bp
+
+    def schedule_swr(self, t_on, n_spikes=1, event=0):
+        """Fire a random subset of swt_active trigger cells at t_on (the subset depends on `event` and the seed)."""
+        pick = np.random.default_rng((self.p.seed, event)).choice(len(self.swt_drive), self.p.swt_active, replace=False)
+        for i, ns in enumerate(self.swt_drive):
+            ns.start, ns.number, ns.interval, ns.noise = t_on, (n_spikes if i in pick else 0), 5.0, 0
 
     def clear_schedules(self):
         for ns in self.swt_drive + self.enc_stims:

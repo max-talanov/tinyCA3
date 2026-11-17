@@ -7,7 +7,7 @@ plasticity on every synapse and replay through the CA3 → EC → DG → CA3 loo
 - Implementation plan and stages: [docs/implementation_plan.md](docs/implementation_plan.md)
 - STC and replay algorithm: [docs/stc_replay_algorithm_tinyCA3.md](docs/stc_replay_algorithm_tinyCA3.md)
 - Literature: [docs/synaptic_tagging_literature_review.md](docs/synaptic_tagging_literature_review.md)
-- Results per stage: [docs/RESULTS.md](docs/RESULTS.md)
+- Results per stage: [docs/RESULTS_2026-11-17.md](docs/RESULTS_2026-11-17.md)
 
 ## Setup
 

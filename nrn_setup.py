@@ -1,7 +1,7 @@
 """Compile (if needed) and load the NMODL mechanisms in neuron/.
 
 Run from the project venv (Python 3.13, pip `neuron==9.0.2`) with PYTHONPATH unset: the app-bundle NEURON in
-PYTHONPATH shadows pip's and cannot load under Homebrew's Python (T0, docs/RESULTS.md section 1).
+PYTHONPATH shadows pip's and cannot load under Homebrew's Python (T0, docs/RESULTS_2026-11-17.md section 1).
 """
 import subprocess
 import sys
