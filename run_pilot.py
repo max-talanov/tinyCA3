@@ -9,8 +9,12 @@ Timeline (real time, no compression):
             from the first encoding that contains Λ or V
   0.5, 1.5, 3, 6 h  replay epochs: 20 triggered SWR events each, 90 s apart (30 min)
   between   offline integration of Tt, z, P every 10 s
-Usage: .venv/bin/python run_pilot.py
+Usage: .venv/bin/python run_pilot.py                      (seed 1, full output for make_figures.py)
+       .venv/bin/python run_pilot.py --seed 3 --light     (results/seeds/pilot_s3.pkl, no voltages or spikes)
+       .venv/bin/python run_pilot.py --seed 3 --light --no-replay   (paired control: no SWR events, same slow dynamics)
+The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
 """
+import argparse
 import pickle
 import time
 from pathlib import Path
@@ -30,8 +34,13 @@ REPLAY_FRACTION = 0.8          # pattern k counts as replayed if >= 80% of its c
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--light", action="store_true", help="store events without spikes and voltages")
+    ap.add_argument("--no-replay", action="store_true", help="skip the SWR events (paired control)")
+    args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
-    cp, sp = CircuitParams(), STCParams()
+    cp, sp = CircuitParams(seed=args.seed), STCParams()
     circ = Circuit(cp)
     n = len(circ.p1)
     post_idx = circ.p1_post
@@ -82,6 +91,8 @@ def main():
         t_s = ev_t
         if ev_t >= T_END_S:
             break
+        if args.no_replay:
+            continue
         circ.set_state(replay=True)                     # replay state
         circ.schedule_swr(SWR_AT_MS, event=block)
         r = circ.run_block(EVENT_MS, Tt, z, P, block=block)
@@ -92,14 +103,26 @@ def main():
         active = {cid for cid in CELL_IDS if win(r["spikes"][("PYR", cid)])}
         frac = {k: len(active & set(PATTERNS[k])) / len(PATTERNS[k]) for k in PATTERN_ORDER}
         replayed = [k for k in PATTERN_ORDER if frac[k] >= REPLAY_FRACTION]
-        events.append(dict(t_s=t_s, frac=frac, replayed=replayed, n_active=len(active),
-                           spikes={k: v for k, v in r["spikes"].items()}, v=r["v"], t=r["t"]))
+        ev = dict(t_s=t_s, frac=frac, replayed=replayed, n_active=len(active), active=sorted(active))
+        if not args.light:
+            ev.update(spikes={k: v for k, v in r["spikes"].items()}, v=r["v"], t=r["t"])
+        events.append(ev)
         print(f"t={t_s / 3600:.2f} h  active {len(active):2d}  replayed {replayed}", flush=True)
         if abs(t_s - EPOCHS_H[1] * 3600.0 - (N_EVENTS - 1) * EVENT_GAP_S) < 1:
             snapshots["after epoch 2 (~1.98 h)"] = (t_s, (Tt + z).copy())
     log(t_s, Tt, z, P)
     snapshots["8 h"] = (t_s, (Tt + z).copy())
 
+    if args.light:
+        (OUT / "seeds").mkdir(exist_ok=True)
+        name = OUT / "seeds" / f"pilot_s{args.seed}{'_norep' if args.no_replay else ''}.pkl"
+        with open(name, "wb") as f:
+            pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, slow_t=np.array(slow["t"]),
+                             slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
+                             z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__), f)
+        print("saved", name)
+        return
     np.savez_compressed(OUT / "pilot.npz", slow_t=np.array(slow["t"]), slow_P=np.array(slow["P"]),
                         slow_M_DA=np.array(slow["M_DA"]), slow_M_5HT=np.array(slow["M_5HT"]),
                         p1_pre=circ.p1_pre, p1_post=circ.p1_post)
