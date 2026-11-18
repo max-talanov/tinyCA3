@@ -41,4 +41,5 @@ The mechanisms in `neuron/` are compiled on first use by `nrn_setup.load_mechani
 | `stc.py` | PRP pools, DA/5-HT schedules, offline integration of tags and captured weights |
 | `run_pilot.py`, `make_figures.py` | 8-h pilot (`results/pilot.npz`; the 81-MB `pilot_events.pkl` is not committed) and Figures 2–6 |
 | `replay_stats.py` | Null readout (hypergeometric chance level) and 5-seed statistics → `results/replay_stats.json`, Figure 7; needs `run_pilot.py --seed N --light [--no-replay]` for seeds 1–5 (`results/seeds/`) |
+| `da_stats.py` | DA during replay (VTA mode, `run_pilot.py --replay-da 10`) against replay and no-replay, 5 seeds → `results/da_stats.json`, Figure 8 |
 | `tests/` | One test file per stage |

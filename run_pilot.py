@@ -12,6 +12,8 @@ Timeline (real time, no compression):
 Usage: .venv/bin/python run_pilot.py                      (seed 1, full output for make_figures.py)
        .venv/bin/python run_pilot.py --seed 3 --light     (results/seeds/pilot_s3.pkl, no voltages or spikes)
        .venv/bin/python run_pilot.py --seed 3 --light --no-replay   (paired control: no SWR events, same slow dynamics)
+       .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
+            DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
 """
 import argparse
@@ -38,6 +40,9 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--light", action="store_true", help="store events without spikes and voltages")
     ap.add_argument("--no-replay", action="store_true", help="skip the SWR events (paired control)")
+    ap.add_argument("--replay-da", type=float, default=0.0,
+                    help="minutes of DA onto Λ cells after an event that replays Λ (0 = off)")
+    ap.add_argument("--replay-da-amp", type=float, default=1.0)
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     cp, sp = CircuitParams(seed=args.seed), STCParams()
@@ -107,6 +112,9 @@ def main():
         if not args.light:
             ev.update(spikes={k: v for k, v in r["spikes"].items()}, v=r["v"], t=r["t"])
         events.append(ev)
+        if args.replay_da > 0 and "Λ" in replayed and len(active) < 23:
+            pulses.append(ModPulse("DA", t_s, 60.0 * args.replay_da, args.replay_da_amp))
+            ev["da"] = True
         print(f"t={t_s / 3600:.2f} h  active {len(active):2d}  replayed {replayed}", flush=True)
         if abs(t_s - EPOCHS_H[1] * 3600.0 - (N_EVENTS - 1) * EVENT_GAP_S) < 1:
             snapshots["after epoch 2 (~1.98 h)"] = (t_s, (Tt + z).copy())
@@ -115,9 +123,11 @@ def main():
 
     if args.light:
         (OUT / "seeds").mkdir(exist_ok=True)
-        name = OUT / "seeds" / f"pilot_s{args.seed}{'_norep' if args.no_replay else ''}.pkl"
+        suffix = "_norep" if args.no_replay else (f"_rda{args.replay_da:g}" if args.replay_da > 0 else "")
+        name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
-            pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, slow_t=np.array(slow["t"]),
+            pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
+                             pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
                              p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__), f)
