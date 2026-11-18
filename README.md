@@ -42,4 +42,5 @@ The mechanisms in `neuron/` are compiled on first use by `nrn_setup.load_mechani
 | `run_pilot.py`, `make_figures.py` | 8-h pilot (`results/pilot.npz`; the 81-MB `pilot_events.pkl` is not committed) and Figures 2–6 |
 | `replay_stats.py` | Null readout (hypergeometric chance level) and 5-seed statistics → `results/replay_stats.json`, Figure 7; needs `run_pilot.py --seed N --light [--no-replay]` for seeds 1–5 (`results/seeds/`) |
 | `da_stats.py` | DA during replay (VTA mode, `run_pilot.py --replay-da 10`) against replay and no-replay, 5 seeds → `results/da_stats.json`, Figure 8 |
+| `x4_stats.py` | Experiment X4: Λ encoded without DA (`run_pilot.py --no-encoding-da`), with and without replay DA, 5 seeds → `results/x4_stats.json`, Figure 9 |
 | `tests/` | One test file per stage |

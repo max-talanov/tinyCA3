@@ -43,6 +43,8 @@ def main():
     ap.add_argument("--replay-da", type=float, default=0.0,
                     help="minutes of DA onto Λ cells after an event that replays Λ (0 = off)")
     ap.add_argument("--replay-da-amp", type=float, default=1.0)
+    ap.add_argument("--no-encoding-da", action="store_true",
+                    help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     cp, sp = CircuitParams(seed=args.seed), STCParams()
@@ -72,6 +74,8 @@ def main():
     Tt, z = enc["Tt"], enc["z"]
     t_s = t_enc_ms / 1000.0
     pulses = [ModPulse("DA", enc_on["Λ"] / 1000.0, 3600.0), ModPulse("5-HT", enc_on["V"] / 1000.0, 3600.0)]
+    if args.no_encoding_da:
+        pulses = [p for p in pulses if p.source != "DA"]
 
     # --- slow dynamics and replay ------------------------------------------------------------------------------
     slow = dict(t=[], Tt=[], z=[], P=[], M_DA=[], M_5HT=[])
@@ -124,6 +128,8 @@ def main():
     if args.light:
         (OUT / "seeds").mkdir(exist_ok=True)
         suffix = "_norep" if args.no_replay else (f"_rda{args.replay_da:g}" if args.replay_da > 0 else "")
+        if args.no_encoding_da:
+            suffix = "_noencda" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
