@@ -163,7 +163,21 @@ def figure_10(stc, nostc, summary):
         ax.plot(np.concatenate(ts), np.concatenate(ws), mk, color=col, ms=2, alpha=0.6, mew=0,
                 label=f"spikes, {lab}")
     tt, wt = probe_slow(stc, "Λ")
-    ax.plot(tt[tt > 0.05], wt[tt > 0.05], color=STC_COL, lw=1.4, label="STC factor 1 + T̃ + z")
+    ax.plot(tt[tt > 0.05], wt[tt > 0.05], color=STC_COL, lw=1.4, label="STC factor, Λ synapse")
+    ti, wi = probe_slow(stc, "I")
+    ax.plot(ti[ti > 0.05], wi[ti > 0.05], color=PCOL["I"], lw=1.4, ls="-.", label="STC factor, I synapse")
+    ins = ax.inset_axes([0.09, 0.36, 0.40, 0.30])
+    ins.plot(tt / 3600, wt, color=STC_COL, lw=1.2)
+    ins.plot(ti / 3600, wi, color=PCOL["I"], lw=1.2, ls="-.")
+    ins.axhline(1, color=STP_COL, lw=0.8, ls="--")
+    ins.set_xlim(0, 8)
+    ins.set_ylim(0.95, 1.55)
+    ins.set_xticks([0, 1, 2, 4, 8])
+    ins.tick_params(labelsize=6)
+    ins.set_xlabel("h", fontsize=6, labelpad=1)
+    ins.set_title("STC factors, linear time", fontsize=6.5, pad=2)
+    ins.text(8, 1.30, "Λ: DA, captured", color=STC_COL, fontsize=6, ha="right", va="bottom")
+    ins.text(8, 1.01, "I: no PRPs, decays", color=PCOL["I"], fontsize=6, ha="right", va="bottom")
     ax.axhline(1, color=STP_COL, lw=1.0, ls="--", label="STC factor without STC")
     for e in EPOCHS_H:
         ax.axvspan(e * 3600, e * 3600 + 1800, color="#999", alpha=0.12, lw=0)
@@ -171,8 +185,8 @@ def figure_10(stc, nostc, summary):
     ax.set_xlim(0.2, 8 * 3600)
     ax.set_xticks([1, 10, 60, 600, 3600, 4 * 3600], ["1 s", "10 s", "1 min", "10 min", "1 h", "4 h"])
     ax.set_xlabel("time from start of encoding (log)")
-    ax.set_ylabel("W / w0, Λ synapse")
-    ax.set_title("Λ synapse, 0.2 s to 8 h (grey: replay epochs, P1 × 2.5)", fontsize=8)
+    ax.set_ylabel("W / w0 (dots: spikes of the Λ synapse)")
+    ax.set_title("0.2 s to 8 h (grey: replay epochs, P1 × 2.5)", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5, loc="upper left", ncol=2)
 
     # (d) 8 h, pattern means, all five seeds

@@ -100,7 +100,9 @@ same `advance_slow` as the run.
   - Lines: STC factors of the Λ and I probes, and the flat factor without STC.
 - **(c) One log time axis, 0.2 s to 8 h.**
   - Dots: every spike of the Λ synapse, in encoding and in replay. Replay spikes include the replay-state scale of 2.5.
-  - Red line: the STC factor of the Λ synapse.
+  - Red line: the STC factor of the Λ synapse. Green dash-dot: the STC factor of the I synapse ex_23 → ex_33.
+  - Inset: the same two STC factors on a linear axis in hours. Both start near 1.4. The Λ synapse is captured under DA
+    and keeps 1.30 at 8 h. The I synapse gets no PRPs, so its tag decays to 1.00 by about 6 h.
   - Grey bands: the four replay epochs.
 - **(d) Pattern means over 8 h.** Mean 1 + T̃ + z of the synapses inside Λ, V, I and O, over 5 seeds (line: mean,
   band: range across seeds). The dashed lines are the five runs without STC.
