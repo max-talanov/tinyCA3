@@ -12,6 +12,8 @@ Timeline (real time, no compression):
 Usage: .venv/bin/python run_pilot.py                      (seed 1, full output for make_figures.py)
        .venv/bin/python run_pilot.py --seed 3 --light     (results/seeds/pilot_s3.pkl, no voltages or spikes)
        .venv/bin/python run_pilot.py --seed 3 --light --no-replay   (paired control: no SWR events, same slow dynamics)
+       .venv/bin/python run_pilot.py --seed 3 --light --no-stc   (STP only: P1 plastic = 0, no tags, no capture;
+            results/seeds/pilot_s3_nostc.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
             DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
@@ -32,7 +34,22 @@ EPOCHS_H = (0.5, 1.5, 3.0, 6.0)
 N_EVENTS, EVENT_GAP_S = 20, 90.0
 ENC_START_MS, ENC_STEP_MS = 300.0, 2300.0
 EVENT_MS, SWR_AT_MS = 450.0, 200.0
+# Probe synapses (pre, post): release, tag and captured weight recorded every 0.5 ms in every online block, so the
+# per-spike efficacy (release / U) * (1 + Tt + z) can be read out (comparison report of 2026-11-20).
+PROBES = {"Λ": (22, 24), "V": (42, 44), "I": (23, 33), "O": (12, 14), "Λ→O": (22, 12)}
 REPLAY_FRACTION = 0.8          # pattern k counts as replayed if >= 80% of its cells spike in the event window
+
+
+def compact_probes(t0_s, kind, t, rec, every=20):
+    """Probe traces of one online block, compacted: the values at each presynaptic spike (spk_*) and Tt, z every
+    `every` samples (10 ms). Sample 0 is taken inside finitialize, before run_block restores Tt and z, so it is
+    dropped."""
+    out = dict(t0_s=t0_s, kind=kind, t=t[1::every].astype(np.float32))
+    for name, r in rec.items():
+        idx = np.nonzero(np.diff(r["n_pre"]) > 0)[0] + 1
+        out[name] = dict(spk_t=t[idx], spk_rel=r["last_rel"][idx], spk_Tt=r["Tt"][idx], spk_z=r["z"][idx],
+                         Tt=r["Tt"][1::every].astype(np.float32), z=r["z"][1::every].astype(np.float32))
+    return out
 
 
 def main():
@@ -45,6 +62,8 @@ def main():
     ap.add_argument("--replay-da-amp", type=float, default=1.0)
     ap.add_argument("--no-encoding-da", action="store_true",
                     help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
+    ap.add_argument("--no-stc", action="store_true",
+                    help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
     cp, sp = CircuitParams(seed=args.seed), STCParams()
@@ -52,6 +71,25 @@ def main():
     n = len(circ.p1)
     post_idx = circ.p1_post
     masks = {k: pattern_synapse_mask(circ, k) for k in PATTERN_ORDER}
+    if args.no_stc:
+        for _, _, s in circ.p1:
+            s.plastic = 0
+    from cells import h
+    syn_of = {(a, b): s for a, b, s in circ.p1}
+    probe_rec = {}
+    for name, ab in PROBES.items():
+        s = syn_of[ab]
+        probe_rec[name] = {}
+        for var in ("last_rel", "Tt", "z", "n_pre"):
+            v = h.Vector()
+            v.record(getattr(s, f"_ref_{var}"), 0.5)
+            probe_rec[name][var] = v
+    probes = []          # one dict per online block: t (ms in block), t0_s (block start), and the probe traces
+
+    def grab_probes(t0_s, kind):
+        probes.append(compact_probes(t0_s, kind, np.array(circ.trec),
+                                     {name: {var: np.array(v) for var, v in rec.items()}
+                                      for name, rec in probe_rec.items()}))
     Tt, z, P = np.zeros(n), np.zeros(n), np.zeros(len(CELL_IDS))
 
     # --- encoding (one online block) ---------------------------------------------------------------------------
@@ -59,7 +97,6 @@ def main():
     for k, t_on in enc_on.items():
         circ.schedule_encoding(k, t_on)
     t_enc_ms = ENC_START_MS + len(PATTERN_ORDER) * ENC_STEP_MS
-    from cells import h
     tt_rec = [h.Vector() for _ in range(n)]
     for vec, (_, _, s) in zip(tt_rec, circ.p1):
         vec.record(s._ref_Tt, 5.0)
@@ -68,6 +105,7 @@ def main():
     enc = circ.run_block(t_enc_ms, Tt, z, P, block=0)
     circ.clear_schedules()
     print(f"encoding block {t_enc_ms / 1000:.1f} s simulated in {time.time() - t0:.0f} s", flush=True)
+    grab_probes(0.0, "encoding")
     enc["Tt_trace"] = np.array([np.array(v) for v in tt_rec])
     for v in tt_rec:
         v.play_remove()
@@ -105,6 +143,7 @@ def main():
         circ.set_state(replay=True)                     # replay state
         circ.schedule_swr(SWR_AT_MS, event=block)
         r = circ.run_block(EVENT_MS, Tt, z, P, block=block)
+        grab_probes(t_s, "replay")
         circ.clear_schedules()
         block += 1
         Tt, z = r["Tt"], r["z"]
@@ -130,13 +169,16 @@ def main():
         suffix = "_norep" if args.no_replay else (f"_rda{args.replay_da:g}" if args.replay_da > 0 else "")
         if args.no_encoding_da:
             suffix = "_noencda" + suffix
+        if args.no_stc:
+            suffix = "_nostc" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
                              pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
-                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__), f)
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc,
+                             probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
         print("saved", name)
         return
     np.savez_compressed(OUT / "pilot.npz", slow_t=np.array(slow["t"]), slow_P=np.array(slow["P"]),
