@@ -14,6 +14,8 @@ Usage: .venv/bin/python run_pilot.py                      (seed 1, full output f
        .venv/bin/python run_pilot.py --seed 3 --light --no-replay   (paired control: no SWR events, same slow dynamics)
        .venv/bin/python run_pilot.py --seed 3 --light --no-stc   (STP only: P1 plastic = 0, no tags, no capture;
             results/seeds/pilot_s3_nostc.pkl)
+       .venv/bin/python run_pilot.py --seed 3 --light --prp-block   (anisomycin analogue: alpha_P = 0, no PRPs, so
+            no capture; check 1 of the algorithm doc section 4, T7 (b) of the plan; results/seeds/pilot_s3_prpblock.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
             DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
@@ -62,11 +64,13 @@ def main():
     ap.add_argument("--replay-da-amp", type=float, default=1.0)
     ap.add_argument("--no-encoding-da", action="store_true",
                     help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
+    ap.add_argument("--prp-block", action="store_true",
+                    help="PRP synthesis blocked (alpha_P = 0): tags are set but never captured")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
-    cp, sp = CircuitParams(seed=args.seed), STCParams()
+    cp, sp = CircuitParams(seed=args.seed), STCParams(alpha_P=0.0 if args.prp_block else 1.0)
     circ = Circuit(cp)
     n = len(circ.p1)
     post_idx = circ.p1_post
@@ -171,13 +175,15 @@ def main():
             suffix = "_noencda" + suffix
         if args.no_stc:
             suffix = "_nostc" + suffix
+        if args.prp_block:
+            suffix = "_prpblock" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
                              pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
-                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc,
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block,
                              probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
         print("saved", name)
         return
