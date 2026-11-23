@@ -16,6 +16,8 @@ Usage: .venv/bin/python run_pilot.py                      (seed 1, full output f
             results/seeds/pilot_s3_nostc.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --prp-block   (anisomycin analogue: alpha_P = 0, no PRPs, so
             no capture; check 1 of the algorithm doc section 4, T7 (b) of the plan; results/seeds/pilot_s3_prpblock.pkl)
+       .venv/bin/python run_pilot.py --seed 3 --light --mod-min 10   (DA and 5-HT on for 10 min instead of 60;
+            results/seeds/pilot_s3_mod10.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
             DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
@@ -64,6 +66,8 @@ def main():
     ap.add_argument("--replay-da-amp", type=float, default=1.0)
     ap.add_argument("--no-encoding-da", action="store_true",
                     help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
+    ap.add_argument("--mod-min", type=float, default=60.0,
+                    help="minutes of DA (Λ cells) and 5-HT (V cells) from the encoding of Λ and V (default 60, Lehr 2022)")
     ap.add_argument("--prp-block", action="store_true",
                     help="PRP synthesis blocked (alpha_P = 0): tags are set but never captured")
     ap.add_argument("--no-stc", action="store_true",
@@ -115,7 +119,8 @@ def main():
         v.play_remove()
     Tt, z = enc["Tt"], enc["z"]
     t_s = t_enc_ms / 1000.0
-    pulses = [ModPulse("DA", enc_on["Λ"] / 1000.0, 3600.0), ModPulse("5-HT", enc_on["V"] / 1000.0, 3600.0)]
+    pulses = [ModPulse("DA", enc_on["Λ"] / 1000.0, 60.0 * args.mod_min),
+              ModPulse("5-HT", enc_on["V"] / 1000.0, 60.0 * args.mod_min)]
     if args.no_encoding_da:
         pulses = [p for p in pulses if p.source != "DA"]
 
@@ -177,13 +182,15 @@ def main():
             suffix = "_nostc" + suffix
         if args.prp_block:
             suffix = "_prpblock" + suffix
+        if args.mod_min != 60.0:
+            suffix = f"_mod{args.mod_min:g}" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
                              pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
-                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block,
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min,
                              probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
         print("saved", name)
         return
