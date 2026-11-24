@@ -18,6 +18,8 @@ Usage: .venv/bin/python run_pilot.py                      (seed 1, full output f
             no capture; check 1 of the algorithm doc section 4, T7 (b) of the plan; results/seeds/pilot_s3_prpblock.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --mod-min 10   (DA and 5-HT on for 10 min instead of 60;
             results/seeds/pilot_s3_mod10.pkl)
+       .venv/bin/python run_pilot.py --seed 3 --light --mod-min 10 --gate 30   (DA and 5-HT for 10 min switch on a
+            synthesis trigger that decays with 30 min; results/seeds/pilot_s3_mod10_gate30.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
             DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
@@ -68,13 +70,17 @@ def main():
                     help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
     ap.add_argument("--mod-min", type=float, default=60.0,
                     help="minutes of DA (Λ cells) and 5-HT (V cells) from the encoding of Λ and V (default 60, Lehr 2022)")
+    ap.add_argument("--gate", type=float, default=0.0,
+                    help="synthesis trigger: the modulator switches on a per-cell synthesis state that decays with "
+                         "this time constant (min); 0 = off, theta_pro follows the modulator (L&T 2021)")
     ap.add_argument("--prp-block", action="store_true",
                     help="PRP synthesis blocked (alpha_P = 0): tags are set but never captured")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
     OUT.mkdir(exist_ok=True)
-    cp, sp = CircuitParams(seed=args.seed), STCParams(alpha_P=0.0 if args.prp_block else 1.0)
+    cp, sp = CircuitParams(seed=args.seed), STCParams(alpha_P=0.0 if args.prp_block else 1.0,
+                                                         tau_G_min=args.gate)
     circ = Circuit(cp)
     n = len(circ.p1)
     post_idx = circ.p1_post
@@ -125,15 +131,17 @@ def main():
         pulses = [p for p in pulses if p.source != "DA"]
 
     # --- slow dynamics and replay ------------------------------------------------------------------------------
-    slow = dict(t=[], Tt=[], z=[], P=[], M_DA=[], M_5HT=[])
+    slow = dict(t=[], Tt=[], z=[], P=[], G=[], M_DA=[], M_5HT=[])
+    G = None
 
-    def log(t, Tt_, z_, P_):
+    def log(t, Tt_, z_, P_, G_=None):
         if not slow["t"] or t - slow["t"][-1] >= 59.9:
             _, src = modulator_at(pulses, t)
             slow["t"].append(t)
             slow["Tt"].append({k: float(Tt_[m].mean()) for k, m in masks.items()})
             slow["z"].append({k: float(z_[m].mean()) for k, m in masks.items()})
             slow["P"].append(P_.copy())
+            slow["G"].append(np.zeros_like(P_) if G_ is None else G_.copy())
             slow["M_DA"].append(src["DA"])
             slow["M_5HT"].append(src["5-HT"])
 
@@ -143,7 +151,7 @@ def main():
     block = 1
     event_times = [h_ * 3600.0 + i * EVENT_GAP_S for h_ in EPOCHS_H for i in range(N_EVENTS)]
     for ev_t in event_times + [T_END_S]:
-        Tt, z, P = advance(Tt, z, P, post_idx, pulses, t_s, ev_t, sp, on_step=log)
+        Tt, z, P, G = advance(Tt, z, P, post_idx, pulses, t_s, ev_t, sp, on_step=log, G=G)
         t_s = ev_t
         if ev_t >= T_END_S:
             break
@@ -170,7 +178,7 @@ def main():
         print(f"t={t_s / 3600:.2f} h  active {len(active):2d}  replayed {replayed}", flush=True)
         if abs(t_s - EPOCHS_H[1] * 3600.0 - (N_EVENTS - 1) * EVENT_GAP_S) < 1:
             snapshots["after epoch 2 (~1.98 h)"] = (t_s, (Tt + z).copy())
-    log(t_s, Tt, z, P)
+    log(t_s, Tt, z, P, G)
     snapshots["8 h"] = (t_s, (Tt + z).copy())
 
     if args.light:
@@ -182,13 +190,16 @@ def main():
             suffix = "_nostc" + suffix
         if args.prp_block:
             suffix = "_prpblock" + suffix
+        if args.gate > 0:
+            suffix = f"_gate{args.gate:g}" + suffix
         if args.mod_min != 60.0:
             suffix = f"_mod{args.mod_min:g}" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
                              pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
-                             slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]), events=events,
+                             slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]),
+                             slow_G=np.array(slow["G"]), gate=args.gate, events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
                              p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min,
                              probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)

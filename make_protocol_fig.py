@@ -1,6 +1,6 @@
 """Figure P1 of docs/PROTOCOL.md: the pilot protocol at five time scales.
 
-(a) the whole 8-h run; (b) the first 70 min (modulator windows, PRP build-up); (c) the 14.1-s encoding block;
+(a) the whole 8-h run; (b) the first 90 min (modulator windows, PRP build-up); (c) the 14.1-s encoding block;
 (d) one replay epoch; (e) one replay event. Timings are read from run_pilot.py and circuit.py, so the figure
 follows the code. Writes results/fig_protocol.png.
 """
@@ -46,7 +46,7 @@ def main():
     for d, ls, a in ((MOD_MIN, "-", 1), (60, ":", 0.35)):
         lane(ax, rows["DA → Λ cells"], on["Λ"] / 3600, on["Λ"] / 3600 + d / 60, C_DA, alpha=a, h=0.4)
         lane(ax, rows["5-HT → V cells"], on["V"] / 3600, on["V"] / 3600 + d / 60, C_HT, alpha=a, h=0.4)
-    ax.text(1.05, rows["DA → Λ cells"], f"{MOD_MIN:g} min (solid); 60 min in report sections 5–8 (pale)",
+    ax.text(1.05, rows["DA → Λ cells"], f"released {MOD_MIN:g} min (solid) + synthesis trigger; 60 min L&T form (pale)",
             va="center", fontsize=6.5)
     for i, e in enumerate(EPOCHS_H):
         lane(ax, rows["replay epochs"], e, e + N_EVENTS * EVENT_GAP_S / 3600, C_REP)
@@ -62,22 +62,32 @@ def main():
     ax.set_xlabel("time (h)")
     ax.set_title("(a) whole run: 8 h of real time, no compression", fontsize=8, loc="left")
 
-    # (b) first 70 min: modulator windows and PRP pool -----------------------------------------------------------
+    # (b) first 90 min: modulator windows and PRP pool -----------------------------------------------------------
     ax = fig.add_subplot(gs[1, :])
-    t = np.linspace(0, 70, 701)
+    t = np.linspace(0, 90, 901)
     for d, ls in ((5, "--"), (MOD_MIN, "-"), (60, ":")):
         P = np.where(t < d, 1 - np.exp(-t / TAU_P_MIN), (1 - np.exp(-d / TAU_P_MIN)) * np.exp(-(t - d) / TAU_P_MIN))
-        ax.plot(t, P, color="k", ls=ls, lw=1.1, label=f"{d:g} min")
+        ax.plot(t, P, color="k", ls=ls, lw=1.1, label=f"{d:g} min, L&T (θ_pro follows M)")
+    # synthesis trigger: 10-min release, G = dG/dt = M (1 - G) / 2 min - G / 30 min (stc.py)
+    G, Gs = 0.0, []
+    for ti in t:
+        Gs.append(G)
+        M = 1.0 if ti < MOD_MIN else 0.0
+        G += 0.1 * (M * (1 - G) / 2.0 - G / 30.0)
+    ax.plot(t, Gs, color="#2e86c1", lw=1.0, alpha=0.8, label="trigger G, 10-min release, τ_G = 30 min")
+    end = 68.0                                     # synthesis ends ~68 min (mean of 5 seeds, report of 2026-11-24)
+    P = np.where(t < end, 1 - np.exp(-t / TAU_P_MIN), (1 - np.exp(-end / TAU_P_MIN)) * np.exp(-(t - end) / TAU_P_MIN))
+    ax.plot(t, P, color="#d35400", lw=1.6, label="P, 10-min release + trigger (bio-plausible)")
     ax.axvspan(30, 60, color=C_REP, alpha=0.15, lw=0)
     ax.text(45, 0.88, "replay epoch E1 (0.5–1 h)", ha="center", fontsize=7, color="#a0521d")
-    ax.set_xlim(0, 70)
+    ax.set_xlim(0, 90)
     ax.set_ylim(0, 1.0)
     ax.set_xlabel("time (min)")
     ax.set_ylabel("PRP pool P / α_P\n(cell with tags above θ)")
-    ax.legend(frameon=False, fontsize=6.5, title="DA or 5-HT on for", title_fontsize=6.5,
-              loc="upper left", bbox_to_anchor=(0.17, 1.0))
+    ax.legend(frameon=False, fontsize=6.5, title="DA or 5-HT released for", title_fontsize=6.5,
+              loc="upper left", bbox_to_anchor=(1.0, 1.0))
     ax.spines["left"].set_visible(True)
-    ax.set_title("(b) first 70 min: the modulator lowers the PRP threshold; P builds and decays with τ_P = 60 min",
+    ax.set_title("(b) first 90 min: the modulator (or the trigger G it starts) lowers the PRP threshold; P builds and decays with τ_P = 60 min",
                  fontsize=8, loc="left")
 
     # (c) encoding block ------------------------------------------------------------------------------------------
