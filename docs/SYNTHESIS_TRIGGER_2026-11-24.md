@@ -17,6 +17,9 @@ Follow-up to [RESULTS_2026-11-17.md](RESULTS_2026-11-17.md), section 9. The prot
   - 398 of the 400 replay events (5 seeds × 80) have exactly the same active cells.
 - **Consequence.** Sections 3–8 of the report stand. The 60-min pulse was in effect the synthesis window. The
   bio-plausible protocol from now on is a 10-min release with the trigger (`--mod-min 10 --gate 30`).
+- **Replay DA (sections 6–7, rerun).** With the trigger, DA released by replay makes 2.7 times more PRPs in the Λ
+  cells, but capture of Λ is unchanged within 0.003: the tags have decayed by the time replay DA comes. The earlier
+  conclusions hold.
 
 ## 1. Model change
 
@@ -125,7 +128,82 @@ readout at 8 h. Seeds 1–5.
 - **The PRP block is unaffected.** With α_P = 0 no PRPs are made whatever the trigger does, so section 8 holds as it
   is.
 
-## 4. What this means
+## 4. Replay DA with the trigger: sections 6 and 7 rerun
+
+**Question.** In sections 6–7 of the report, DA released by a replay of Λ set the PRP threshold for its 10 min only.
+With the trigger, the same 10-min release keeps synthesis going for about an hour. Does replay DA now capture Λ?
+
+**Protocol.** As in sections 6–7, on the bio-plausible baseline (`--mod-min 10 --gate 30`, seeds 1–5). Every non-burst
+event that replays Λ releases DA onto the Λ cells for 10 min (`--replay-da 10`), and that DA drives G like the encoding
+DA. Controls were rerun with the trigger too:
+
+| Experiment | Condition | Flags (all with `--mod-min 10 --gate 30`) | Output suffix |
+|---|---|---|---|
+| Section 6 | no replay | `--no-replay` | `_mod10_gate30_norep` |
+| | replay | — | `_mod10_gate30` |
+| | replay + DA | `--replay-da 10` | `_mod10_gate30_rda10` |
+| Section 7 (X4) | no DA for Λ | `--no-encoding-da` | `_mod10_gate30_noencda` |
+| | replay DA only | `--no-encoding-da --replay-da 10` | `_mod10_gate30_noencda_rda10` |
+| | encoding DA (reference) | — | `_mod10_gate30` |
+
+Analysis: `rda_trigger_stats.py` → `results/rda_trigger_stats.json`, Figure 15.
+
+![Four panels: effect of replay DA on z per pattern for L&T and trigger; z of Λ at 8 h in experiment X4 for both models; capture of Λ over time with the trigger; PRP pool and trigger G of the Λ cells in the X4 runs with the trigger.](../results/fig_trig_15_replay_da.png)
+
+**Figure 15.** Replay DA with the synthesis trigger.
+
+- **(a)** Section 6: Δz at 8 h (replay + DA − replay), mean ± SD of 5 seeds, for the L&T model (pale) and the
+  trigger (solid). The axis spans about ±0.001.
+- **(b)** Section 7 (X4): z of Λ at 8 h without DA, with replay DA only, and with encoding DA, for both models. Dots
+  are seeds.
+- **(c)** X4 with the trigger: mean z of Λ over time, no DA (grey) and replay DA (red). Thin lines: replay DA events.
+  Seeds 3–5 had no DA event, so their red curves lie on the grey ones.
+- **(d)** X4 with the trigger: PRP pool P (solid) and trigger G (dotted) of the Λ cells, per seed.
+
+**Replay is the same as before.** Replay DA events happen at the same times as in the L&T runs: 3, 11, 0, 1 and 4 per
+seed in section 6; in X4 at 0.97 and 1.95 h (seed 1) and 0.68, 0.75, 1.70, 1.75, 3.33 and 6.28 h (seed 2), none in
+seeds 3–5.
+
+**Section 6, DA on top of encoding DA** (mean z at 8 h, 5 seeds):
+
+| Pattern | L&T: replay | L&T: replay + DA | Trigger: no replay | Trigger: replay | Trigger: replay + DA | Δz (trigger) |
+|---|---|---|---|---|---|---|
+| Λ | 0.242 | 0.242 | 0.272 | 0.243 | 0.243 | +0.0002 ± 0.0002 |
+| V | 0.241 | 0.241 | 0.276 | 0.242 | 0.242 | +0.0002 ± 0.0001 |
+| I | 0.142 | 0.142 | 0.155 | 0.145 | 0.145 | +0.0007 ± 0.0007 |
+| O | 0.069 | 0.069 | 0.080 | 0.069 | 0.069 | +0.0000 |
+| Λ∪V | 0.195 | 0.195 | 0.221 | 0.195 | 0.195 | +0.0001 |
+| Λ∪V∪I | 0.160 | 0.160 | 0.182 | 0.160 | 0.161 | +0.0001 ± 0.0001 |
+
+**Section 7 (X4), Λ with DA only from replay:**
+
+| | L&T | Trigger |
+|---|---|---|
+| z of Λ, no DA | 0.045 | 0.045 |
+| z of Λ, replay DA | 0.050 | 0.051 |
+| Δz (replay DA − no DA) | +0.005 ± 0.010 (2/5 seeds) | +0.006 ± 0.011 (2/5 seeds) |
+| z of Λ, encoding DA | 0.242 | 0.243 |
+| Seed 2 (6 DA events): z of Λ, no DA → replay DA | 0.047 → 0.069 | 0.048 → 0.073 |
+| Seed 1 (2 DA events): z of Λ, no DA → replay DA | 0.052 → 0.057 | 0.052 → 0.057 |
+| Peak PRP pool of Λ cells, seeds 1 and 2 | 0.27, 0.31 | 0.78, 0.83 |
+
+**Findings.**
+
+- **The trigger makes replay DA produce far more PRPs, but no more capture.** In X4 the PRP pool of the Λ cells
+  reaches 0.78–0.83 instead of 0.27–0.31, because each replay DA event now opens about an hour of synthesis
+  (panel d). Yet z of Λ rises by only 0.001–0.003 more than in the L&T runs (seed 2: 0.073 against 0.069).
+- **Capture of Λ still stops at about 1.3 h in every run** (panel c), with or without replay DA, because the Λ tags
+  fall below the capture threshold (|T̃| < 0.2) by then. PRPs made after that find nothing to capture.
+- **Replay DA on top of encoding DA remains redundant** (section 6): Δz ≤ 0.001 for every pattern.
+- **Replay DA still gives about 3% of the capture that encoding DA gives** (+0.006 against +0.197), and only in the
+  2 of 5 seeds that replay Λ at all.
+
+**Conclusion.** Sections 6 and 7 stand under the trigger. Their explanation is confirmed more sharply: what limits
+replay DA is the tag window, not the length of protein synthesis. Making synthesis last longer, whether by a longer
+modulator pulse or by the trigger, does not let replay rescue an uncaptured pattern. That would need tags that last
+longer or that replay refreshes, or a replay trigger that picks weakly tagged patterns (report section 7).
+
+## 5. What this means
 
 1. **The results of 2026-11-17, sections 3–8, stand.** Their 60-min modulator pulse is equivalent to a 10-min release
    followed by a 30-min synthesis trigger.
@@ -133,14 +211,16 @@ readout at 8 h. Seeds 1–5.
    The synthesis state it triggers lasts about an hour. The PRPs last longer still (τ_P = 60 min).
 3. **τ_G is the free parameter that matters.** Between 30 and 60 min it changes nothing here; below about 20 min
    capture drops. It is not measured for CA3.
-4. **The replay-DA experiments need rerunning.** Sections 6 and 7 of the report (DA released by replay of Λ, 10 min)
-   used the L&T form, so that DA opened a 10-min synthesis window. With the trigger it opens about an hour. Section 7
-   concluded that replay DA cannot replace DA at encoding because the tags decay before PRPs build up. This should be
-   checked with `--gate 30`.
+4. **The replay-DA experiments hold too (section 4).** With the trigger, replay DA makes about 2.7 times more PRPs, but
+   capture of Λ is unchanged within 0.003, because the tags have decayed by then. Faster or longer PRP synthesis is
+   therefore not the change that would let replay strengthen a memory in this circuit; longer-lived or refreshed
+   tags would be.
 
 **Status.** Pilot, hand-calibrated weights, 5 seeds. The bio-plausible protocol is `--mod-min 10 --gate 30`. The code
-default stays the L&T form (60 min, no trigger) so that earlier runs keep their file names.
+default stays the L&T form (60 min, no trigger) so that earlier runs keep their file names. All sections of the
+report of 2026-11-17 (3–8) have now been checked on the bio-plausible protocol: 3–5 and 8 in section 3 here, 6–7 in
+section 4.
 
-**Files.** `stc.py`, `run_pilot.py` (`--gate`), `trigger_stats.py`, `results/trigger_stats.json`,
-`results/fig_trig_14_synthesis_trigger.png`, `results/seeds/pilot_s{1..5}_mod10_gate30.pkl` and
-`_mod5_gate30.pkl`.
+**Files.** `stc.py`, `run_pilot.py` (`--gate`), `trigger_stats.py`, `rda_trigger_stats.py`,
+`results/trigger_stats.json`, `results/rda_trigger_stats.json`, `results/fig_trig_14_synthesis_trigger.png`,
+`results/fig_trig_15_replay_da.png`, and `results/seeds/pilot_s{1..5}_mod10_gate30*.pkl` and `_mod5_gate30.pkl`.

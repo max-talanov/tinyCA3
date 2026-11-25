@@ -88,6 +88,7 @@ every event. Runs are `env -u PYTHONPATH .venv/bin/python run_pilot.py --seed S 
 | Baseline, 5-min modulator | `--mod-min 5` | `_mod5` | DA and 5-HT on for 5 min | 9 |
 | **Bio-plausible baseline** | `--mod-min 10 --gate 30` | `_mod10_gate30` | 10-min release, synthesis trigger with τ_G = 30 min | Report of 2026-11-24 |
 | Bio-plausible, 5-min release | `--mod-min 5 --gate 30` | `_mod5_gate30` | 5-min release, same trigger | Report of 2026-11-24 |
+| Bio-plausible: no replay, replay DA, X4 | `--mod-min 10 --gate 30` plus `--no-replay`, `--replay-da 10`, `--no-encoding-da [--replay-da 10]` | `_mod10_gate30_norep`, `_rda10`, `_noencda`, `_noencda_rda10` | Sections 5–7 on the bio-plausible baseline; replay DA drives G too | Report of 2026-11-24, section 4 |
 | No replay | `--no-replay` | `_norep` | No SWR events; offline STC only | 5 |
 | Replay DA (VTA mode) | `--replay-da 10` | `_rda10` | An event that replays Λ (not a burst) releases DA onto the Λ cells for 10 min | 6 |
 | X4 | `--no-encoding-da --replay-da 10` | `_noencda_rda10` | No DA at encoding; Λ gets DA only from replay | 7 |
@@ -109,4 +110,5 @@ Flags combine. The suffixes are joined in the order `_mod`, `_gate`, `_prpblock`
 | `prp_stats.py` | Baseline, PRP block | `results/prp_stats.json`, Figure 12 |
 | `mod_stats.py` | Baseline, 10-min and 5-min modulator, PRP block | `results/mod_stats.json`, Figure 13 |
 | `trigger_stats.py` | L&T 60 min, 10 min with and without trigger, 5 min with trigger, PRP block; offline τ_G sweep | `results/trigger_stats.json`, Figure 14 |
+| `rda_trigger_stats.py` | No replay, replay DA and X4, L&T and with trigger | `results/rda_trigger_stats.json`, Figure 15 |
 | `make_protocol_fig.py` | Constants of the code | `results/fig_protocol.png` (Figure P1) |
