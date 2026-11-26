@@ -5,11 +5,17 @@ This document describes the protocol `run_pilot.py` runs. The timings come from 
 described in [ca3_basic_circuit_architecture.md](ca3_basic_circuit_architecture.md). The results are in
 [RESULTS_2026-11-17.md](RESULTS_2026-11-17.md).
 
+**Pattern layout (2026-11-26).** The default is now layout B, the patterns of the corrected figure: X (DA), + (5-HT),
+=, ‖, X∪+ and =∪‖ ([architecture doc](ca3_basic_circuit_architecture.md), Table 3). The protocol is the same in both
+layouts. The pattern names in the text below are those of layout B; the v1 names (Λ, V, I, O, Λ∪V, Λ∪V∪I), used in
+the reports up to 2026-11-24, map onto them by role: Λ → X, V → +, I → =, O → ‖, Λ∪V → X∪+, Λ∪V∪I → =∪‖. Select
+with `TINYCA3_LAYOUT=v1|B`; layout-B output goes to `results/layout_B/`.
+
 ![Protocol at five time scales](../results/fig_protocol.png)
 
 **Figure P1.** The protocol at five time scales.
 
-- **(a)** The whole 8-h run. Encoding takes the first 14.1 s. DA and 5-HT are released for 10 min from the encoding of Λ and V (pale: the 60-min L&T form). Four
+- **(a)** The whole 8-h run. Encoding takes the first 14.1 s. DA and 5-HT are released for 10 min from the encoding of X and + (pale: the 60-min L&T form). Four
   replay epochs (E1–E4) of 20 events each follow. Between online blocks, the slow STC variables are integrated
   offline. The readout is at 8 h.
 - **(b)** The first 90 min. The modulator, or the synthesis trigger G it starts, lowers the PRP synthesis
@@ -26,8 +32,8 @@ described in [ca3_basic_circuit_architecture.md](ca3_basic_circuit_architecture.
 | # | Phase | Time | Simulator | What happens |
 |---|---|---|---|---|
 | 0 | Set-up | — | — | Circuit built for the seed: 25 PYR, 25 BC, 6 EC and 6 DG units, 10 SWT trigger cells. T̃ = z = P = 0 |
-| 1 | Encoding | 0–14.1 s | NEURON, online | Patterns Λ, V, I, O, Λ∪V, Λ∪V∪I in turn, starting at 0.3 s and every 2.3 s after. Each is 3 bursts of 100 ms at 100 Hz into EC_k, 0.5 s apart. EC_k → DG_k → the cells of pattern k. Co-firing sets the tags T̃ of the P1 synapses (calcium rule). Encoding state: P1 at w0, BC → PYR at w_bp |
-| 2 | Neuromodulation | From the onset of Λ (DA) and V (5-HT), for D_M | Offline | DA reaches the Λ cells and 5-HT the V cells. While it is on, θ_pro is low, so cells whose tag sum exceeds θ_pro make PRPs. Bio-plausible protocol: DA and 5-HT released for D_M = 10 min switch on a per-cell synthesis trigger G that decays with τ_G = 30 min; θ_pro follows G (section 3 below). The code default is still the L&T form: 60 min, θ_pro follows M |
+| 1 | Encoding | 0–14.1 s | NEURON, online | Patterns X, +, =, ‖, X∪+, =∪‖ in turn, starting at 0.3 s and every 2.3 s after. Each is 3 bursts of 100 ms at 100 Hz into EC_k, 0.5 s apart. EC_k → DG_k → the cells of pattern k. Co-firing sets the tags T̃ of the P1 synapses (calcium rule). Encoding state: P1 at w0, BC → PYR at w_bp |
+| 2 | Neuromodulation | From the onset of X (DA) and + (5-HT), for D_M | Offline | DA reaches the X cells and 5-HT the + cells. While it is on, θ_pro is low, so cells whose tag sum exceeds θ_pro make PRPs. Bio-plausible protocol: DA and 5-HT released for D_M = 10 min switch on a per-cell synthesis trigger G that decays with τ_G = 30 min; θ_pro follows G (section 3 below). The code default is still the L&T form: 60 min, θ_pro follows M |
 | 3 | Offline STC | Between all online blocks | numpy, 10-s steps | T̃ decays (τ ≈ 1.9 h). P follows dP/dt = (−P + α_P·Θ[Σ\|T̃\| − θ_pro(M)]) / τ_P. z captures while \|T̃\| > 0.2 and P > 0 |
 | 4 | Replay epochs | E1 0.5–1 h, E2 1.5–2 h, E3 3–3.5 h, E4 6–6.5 h | NEURON, online | 20 events per epoch, 90 s apart |
 | 5 | One replay event | 450 ms | NEURON, online | Replay state: P1 × 2.5, BC → PYR × 2. At 200 ms, 4 of the 10 SWT cells fire once and seed ~3–8 random PYR. The recurrent P1 weights, scaled by (1 + T̃ + z), decide which pattern completes. Replay co-firing changes T̃ too |
@@ -38,7 +44,7 @@ The online and offline phases alternate. No time scale is compressed.
 ```mermaid
 flowchart LR
     S[Set-up<br/>seed, T̃ = z = P = 0] --> E[Encoding block<br/>14.1 s, NEURON]
-    E --> M[DA → Λ cells, 5-HT → V cells<br/>released for D_M from onset<br/>→ synthesis trigger G]
+    E --> M[DA → X cells, 5-HT → + cells<br/>released for D_M from onset<br/>→ synthesis trigger G]
     M --> O[Offline STC<br/>T̃, P, z in 10-s steps]
     O -->|next event time| R[Replay event<br/>450 ms, NEURON]
     R -->|T̃, z updated| O
@@ -56,6 +62,7 @@ flowchart LR
 | Chance | Hypergeometric probability that a random set of the same size covers ≥ 80% of k | `replay_stats.py` |
 | Per-event significance | p_chance < 0.05 / 6 | `replay_stats.py` |
 | Pattern weight | W_k = mean 1 + T̃ + z of the P1 synapses inside k, at fixed times and at 8 h | `stc_compare.py`, `prp_stats.py` |
+| Class weight (layout B) | Mean 1 + T̃ + z per synapse class (architecture doc, Table 3a); each modulated class against its unmodulated twin | `class_stats.py` |
 
 ## 3. Neuromodulator duration and the synthesis trigger
 
@@ -90,8 +97,8 @@ every event. Runs are `env -u PYTHONPATH .venv/bin/python run_pilot.py --seed S 
 | Bio-plausible, 5-min release | `--mod-min 5 --gate 30` | `_mod5_gate30` | 5-min release, same trigger | Report of 2026-11-24 |
 | Bio-plausible: no replay, replay DA, X4 | `--mod-min 10 --gate 30` plus `--no-replay`, `--replay-da 10`, `--no-encoding-da [--replay-da 10]` | `_mod10_gate30_norep`, `_rda10`, `_noencda`, `_noencda_rda10` | Sections 5–7 on the bio-plausible baseline; replay DA drives G too | Report of 2026-11-24, section 4 |
 | No replay | `--no-replay` | `_norep` | No SWR events; offline STC only | 5 |
-| Replay DA (VTA mode) | `--replay-da 10` | `_rda10` | An event that replays Λ (not a burst) releases DA onto the Λ cells for 10 min | 6 |
-| X4 | `--no-encoding-da --replay-da 10` | `_noencda_rda10` | No DA at encoding; Λ gets DA only from replay | 7 |
+| Replay DA (VTA mode) | `--replay-da 10` | `_rda10` | An event that replays X (not a burst) releases DA onto the X cells for 10 min | 6 |
+| X4 | `--no-encoding-da --replay-da 10` | `_noencda_rda10` | No DA at encoding; X gets DA only from replay | 7 |
 | No STC | `--no-stc` | `_nostc` | P1 with plastic = 0: STP only, no tags, no capture | Comparison report |
 | PRP block | `--prp-block` | `_prpblock` | α_P = 0: tags set, nothing captured (anisomycin analogue) | 8 |
 

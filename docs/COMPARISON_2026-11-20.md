@@ -1,5 +1,9 @@
 # tinyCA3: synapses with and without STC (comparison report of 2026-11-20)
 
+> **Pattern layout v1.** This report uses the v1 patterns (Λ, V, I, O), which were misread from the circuit figure and
+> share cells, so the unmodulated controls I and O could capture through Λ and V cells. From 2026-11-26 the default is
+> layout B ([architecture update plan](architecture_update_plan_2026-11-26.md)). Rerun with `TINYCA3_LAYOUT=v1`.
+
 This report answers three comments on [RESULTS_2026-11-17.md](RESULTS_2026-11-17.md):
 
 1. How the weight of a synapse changes over time with and without synaptic tagging and capture (STC), comparing the

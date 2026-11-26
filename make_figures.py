@@ -17,11 +17,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import CELL_IDS, IDX, PATTERN_ORDER, PATTERNS  # noqa: E402
+from circuit import CELL_IDS, IDX, PA, PAB, PATTERN_ORDER, PB, PC, PCOL, PD, RESULTS, PATTERNS  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 BURST = 23   # events with >= 23 of 25 PYR active are whole-network bursts, not pattern replays
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 TCOL = {"PYR": "#d35400", "BC": "#1f5fbf", "EC": "#16a085", "DG": "#8e44ad", "SWT": "#555555"}
 DA_COL, HT_COL = "#c0392b", "#2e6fd8"
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
@@ -56,7 +55,7 @@ def _raster(ax, spikes, t_scale=1.0, xlim=None):
                 st = st[(st >= xlim[0]) & (st <= xlim[1])]
             col = TCOL[typ]
             if typ == "PYR":
-                member = [p for p in ("Λ", "V", "I", "O") if k in PATTERNS[p]]
+                member = [p for p in (PA, PB, PC, PD) if k in PATTERNS[p]]
                 col = PCOL[member[0]] if member else TCOL["PYR"]
             big = typ in ("EC", "DG", "SWT")
             ax.plot(st * t_scale, np.full(len(st), row), "|", color=col, ms=5.0 if big else 2.5, mew=1.4 if big else 0.6)
@@ -90,7 +89,7 @@ def fig_encoding(e):
         ax.text(a + 0.65, 0.65, k, color=PCOL[k], ha="center", va="center", fontsize=11, fontweight="bold")
     t_end = t[-1]
     for p in e["pulses"]:
-        y, col, glyph = (0.15, DA_COL, "Λ") if p["source"] == "DA" else (0.0, HT_COL, "V")
+        y, col, glyph = (0.15, DA_COL, PA) if p["source"] == "DA" else (0.0, HT_COL, PB)
         ax.plot([p["t_on_s"], t_end], [y, y], color=col, lw=3, solid_capstyle="butt")
         ax.text(p["t_on_s"], y + 0.12, f"{p['source']} {glyph}", color=col, fontsize=7, va="bottom")
     ax.set_ylim(-0.1, 1.0)
@@ -155,7 +154,7 @@ def fig_overview(d, e):
                              gridspec_kw=dict(height_ratios=[1.3, 1, 1, 1, 1]))
     ax = axes[0]
     for p in e["pulses"]:
-        y, col, glyph = (2.2, DA_COL, "Λ") if p["source"] == "DA" else (1.7, HT_COL, "V")
+        y, col, glyph = (2.2, DA_COL, PA) if p["source"] == "DA" else (1.7, HT_COL, PB)
         a, b = p["t_on_s"] / 3600, (p["t_on_s"] + p["dur_s"]) / 3600
         ax.plot([a, b], [y, y], color=col, lw=4, solid_capstyle="butt")
         ax.text(a - 0.05, y, glyph, color=col, va="center", ha="right", fontsize=12, fontweight="bold")
@@ -194,12 +193,12 @@ def fig_overview(d, e):
     axes[2].set_ylabel("mean z\n(captured)")
     axes[3].set_ylabel("weight\n1 + T̃ + z")
     P = d["slow_P"]
-    groups = {"Λ cells (DA)": set(PATTERNS["Λ"]), "V cells (5-HT)": set(PATTERNS["V"]),
-              "I only": set(PATTERNS["I"]) - set(PATTERNS["Λ∪V"]),
-              "O only": set(PATTERNS["O"]) - set(PATTERNS["Λ∪V"])}
-    gcol = {"Λ cells (DA)": PCOL["Λ"], "V cells (5-HT)": PCOL["V"], "I only": PCOL["I"], "O only": PCOL["O"]}
-    gsty = {"Λ cells (DA)": dict(lw=3.0, ls="-", alpha=0.5), "V cells (5-HT)": dict(lw=1.2, ls="--"),
-            "I only": dict(lw=3.0, ls="-", alpha=0.5), "O only": dict(lw=1.2, ls="--")}
+    groups = {f"{PA} cells (DA)": set(PATTERNS[PA]), f"{PB} cells (5-HT)": set(PATTERNS[PB]),
+              f"{PC} only": set(PATTERNS[PC]) - set(PATTERNS[PAB]),
+              f"{PD} only": set(PATTERNS[PD]) - set(PATTERNS[PAB])}
+    gcol = {f"{PA} cells (DA)": PCOL[PA], f"{PB} cells (5-HT)": PCOL[PB], f"{PC} only": PCOL[PC], f"{PD} only": PCOL[PD]}
+    gsty = {f"{PA} cells (DA)": dict(lw=3.0, ls="-", alpha=0.5), f"{PB} cells (5-HT)": dict(lw=1.2, ls="--"),
+            f"{PC} only": dict(lw=3.0, ls="-", alpha=0.5), f"{PD} only": dict(lw=1.2, ls="--")}
     for g, cells in groups.items():
         axes[4].plot(th, P[:, [IDX[c] for c in cells]].mean(axis=1), color=gcol[g], label=g, **gsty[g])
     axes[4].set_ylabel("PRP pool P")
@@ -216,7 +215,7 @@ def fig_overview(d, e):
 def fig_weights(d, e):
     snaps = e["snapshots"]
     fig, axes = plt.subplots(1, len(snaps), figsize=(9.0, 3.3))
-    order = [cid for k in ("Λ", "V", "I", "O") for cid in PATTERNS[k]]
+    order = [cid for k in (PA, PB, PC, PD) for cid in PATTERNS[k]]
     order = list(dict.fromkeys(order)) + [c for c in CELL_IDS if c not in set(order)]
     pos = {cid: i for i, cid in enumerate(order)}
     for ax, (label, (t_s, w)) in zip(axes, snaps.items()):
@@ -228,7 +227,7 @@ def fig_weights(d, e):
         ax.set_xlabel("presynaptic cell")
         ax.set_ylabel("postsynaptic cell")
         start = 0
-        for k in ("Λ", "V", "I", "O"):
+        for k in (PA, PB, PC, PD):
             n_new = len([c for c in PATTERNS[k] if pos[c] >= start])
             ax.add_patch(plt.Rectangle((start - 0.5, start - 0.5), n_new, n_new, fill=False, ec=PCOL[k], lw=1.2))
             blk = W[start:start + n_new, start:start + n_new]

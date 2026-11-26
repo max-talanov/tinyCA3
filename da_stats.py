@@ -16,12 +16,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import PATTERN_ORDER  # noqa: E402
+from circuit import PA, PCOL, RESULTS, PATTERN_ORDER  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 SEEDS = (1, 2, 3, 4, 5)
 COND = {"control": "_norep", "replay": "", "replay+DA": "_rda10"}
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 
 
 def load(seed, suffix):
@@ -38,9 +37,9 @@ def main():
             z[c][sd] = {k: float(np.mean(d["z_final"][d["masks"][k]])) for k in PATTERN_ORDER}
             if c == "replay+DA":
                 n_da[sd] = sum(1 for e in d["events"] if e.get("da"))
-                slow[sd] = (np.array(d["slow_t"]), np.array([x["Λ"] for x in d["slow_z"]]))
+                slow[sd] = (np.array(d["slow_t"]), np.array([x[PA] for x in d["slow_z"]]))
             if c == "replay" and sd == 1:
-                slow_rep = (np.array(d["slow_t"]), np.array([x["Λ"] for x in d["slow_z"]]))
+                slow_rep = (np.array(d["slow_t"]), np.array([x[PA] for x in d["slow_z"]]))
     summary = {}
     for k in PATTERN_ORDER:
         a = {c: np.array([z[c][sd][k] for sd in SEEDS]) for c in COND}
@@ -86,8 +85,8 @@ def main():
     t, zz = slow_rep
     ax.plot(t / 3600, zz, "k--", lw=0.8, label="seed 1, replay without DA")
     ax.set_xlabel("time after encoding (h)")
-    ax.set_ylabel("mean z of Λ")
-    ax.set_title("capture of Λ over time", fontsize=8)
+    ax.set_ylabel(f"mean z of {PA}")
+    ax.set_title(f"capture of {PA} over time", fontsize=8)
     ax.legend(frameon=False, fontsize=6)
     for i, a_ in enumerate(axes):
         a_.text(-0.02, 1.02, f"({chr(97 + i)})", transform=a_.transAxes, fontsize=9, fontweight="bold",

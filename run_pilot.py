@@ -4,9 +4,10 @@ Single seed, hand-calibrated weights (circuit.CircuitParams). A pilot: its numbe
 Saves results/pilot.npz (+ results/pilot_events.pkl) for make_figures.py.
 
 Timeline (real time, no compression):
-  0 s       online encoding block: Λ, V, I, O, Λ∪V, Λ∪V∪I in turn, each 3 x 100 ms at 100 Hz into EC_k, 0.4 s apart,
-            next pattern 1 s later (L&T 2021 learning protocol); DA (Λ cells) and 5-HT (V cells) on for 60 min
-            from the first encoding that contains Λ or V
+  0 s       online encoding block: the six patterns in turn (layout B: X, +, =, ‖, X∪+, =∪‖; v1: Λ, V, I, O,
+            Λ∪V, Λ∪V∪I), each 3 x 100 ms at 100 Hz into EC_k, 0.4 s apart,
+            next pattern 1 s later (L&T 2021 learning protocol); DA (X cells) and 5-HT (+ cells) on for 60 min
+            from the encoding of X and +
   0.5, 1.5, 3, 6 h  replay epochs: 20 triggered SWR events each, 90 s apart (30 min)
   between   offline integration of Tt, z, P every 10 s
 Usage: .venv/bin/python run_pilot.py                      (seed 1, full output for make_figures.py)
@@ -20,8 +21,9 @@ Usage: .venv/bin/python run_pilot.py                      (seed 1, full output f
             results/seeds/pilot_s3_mod10.pkl)
        .venv/bin/python run_pilot.py --seed 3 --light --mod-min 10 --gate 30   (DA and 5-HT for 10 min switch on a
             synthesis trigger that decays with 30 min; results/seeds/pilot_s3_mod10_gate30.pkl)
-       .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays Λ releases
-            DA onto the Λ cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
+       .venv/bin/python run_pilot.py --seed 3 --light --replay-da 10   (VTA mode: an event that replays the DA pattern
+            releases DA onto its cells for 10 min; algorithm doc section 2.6, McNamara et al. 2014 via S&A Ch. 14)
+The pattern layout is set by TINYCA3_LAYOUT (circuit.py, default B); output goes to circuit.RESULTS.
 The seed sets the background noise, the sparse trigger wiring (P8) and the trigger subsets of every event.
 """
 import argparse
@@ -31,18 +33,19 @@ from pathlib import Path
 
 import numpy as np
 
-from circuit import CELL_IDS, PATTERN_ORDER, PATTERNS, Circuit, CircuitParams, pattern_synapse_mask
+from circuit import (CELL_IDS, LAYOUT, MOD_PATTERN, PATTERN_ORDER, PATTERNS, PROBES, RESULTS, Circuit, CircuitParams,
+                     class_synapse_masks, pattern_synapse_mask)
 from stc import ModPulse, STCParams, advance, modulator_at
 
-OUT = Path(__file__).resolve().parent / "results"
+OUT = RESULTS
 T_END_S = 8 * 3600.0
 EPOCHS_H = (0.5, 1.5, 3.0, 6.0)
 N_EVENTS, EVENT_GAP_S = 20, 90.0
 ENC_START_MS, ENC_STEP_MS = 300.0, 2300.0
 EVENT_MS, SWR_AT_MS = 450.0, 200.0
 # Probe synapses (pre, post): release, tag and captured weight recorded every 0.5 ms in every online block, so the
-# per-spike efficacy (release / U) * (1 + Tt + z) can be read out (comparison report of 2026-11-20).
-PROBES = {"Λ": (22, 24), "V": (42, 44), "I": (23, 33), "O": (12, 14), "Λ→O": (22, 12)}
+# per-spike efficacy (release / U) * (1 + Tt + z) can be read out (comparison report of 2026-11-20). PROBES comes
+# from the layout in circuit.py: one probe per synapse class.
 REPLAY_FRACTION = 0.8          # pattern k counts as replayed if >= 80% of its cells spike in the event window
 
 
@@ -64,12 +67,12 @@ def main():
     ap.add_argument("--light", action="store_true", help="store events without spikes and voltages")
     ap.add_argument("--no-replay", action="store_true", help="skip the SWR events (paired control)")
     ap.add_argument("--replay-da", type=float, default=0.0,
-                    help="minutes of DA onto Λ cells after an event that replays Λ (0 = off)")
+                    help="minutes of DA onto the DA-pattern cells after an event that replays that pattern (0 = off)")
     ap.add_argument("--replay-da-amp", type=float, default=1.0)
     ap.add_argument("--no-encoding-da", action="store_true",
-                    help="no DA pulse at encoding (5-HT unchanged): Λ can get DA only from replay (experiment X4)")
+                    help="no DA pulse at encoding (5-HT unchanged): the DA pattern gets DA only from replay (experiment X4)")
     ap.add_argument("--mod-min", type=float, default=60.0,
-                    help="minutes of DA (Λ cells) and 5-HT (V cells) from the encoding of Λ and V (default 60, Lehr 2022)")
+                    help="minutes of DA and 5-HT from the encoding of their patterns (default 60, Lehr 2022)")
     ap.add_argument("--gate", type=float, default=0.0,
                     help="synthesis trigger: the modulator switches on a per-cell synthesis state that decays with "
                          "this time constant (min); 0 = off, theta_pro follows the modulator (L&T 2021)")
@@ -78,13 +81,14 @@ def main():
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     cp, sp = CircuitParams(seed=args.seed), STCParams(alpha_P=0.0 if args.prp_block else 1.0,
                                                          tau_G_min=args.gate)
     circ = Circuit(cp)
     n = len(circ.p1)
     post_idx = circ.p1_post
     masks = {k: pattern_synapse_mask(circ, k) for k in PATTERN_ORDER}
+    masks.update(class_synapse_masks(circ))            # layout B: per synapse class, keys 'syn:<class>'
     if args.no_stc:
         for _, _, s in circ.p1:
             s.plastic = 0
@@ -125,8 +129,7 @@ def main():
         v.play_remove()
     Tt, z = enc["Tt"], enc["z"]
     t_s = t_enc_ms / 1000.0
-    pulses = [ModPulse("DA", enc_on["Λ"] / 1000.0, 60.0 * args.mod_min),
-              ModPulse("5-HT", enc_on["V"] / 1000.0, 60.0 * args.mod_min)]
+    pulses = [ModPulse(m, enc_on[k] / 1000.0, 60.0 * args.mod_min) for m, k in MOD_PATTERN.items()]
     if args.no_encoding_da:
         pulses = [p for p in pulses if p.source != "DA"]
 
@@ -172,7 +175,7 @@ def main():
         if not args.light:
             ev.update(spikes={k: v for k, v in r["spikes"].items()}, v=r["v"], t=r["t"])
         events.append(ev)
-        if args.replay_da > 0 and "Λ" in replayed and len(active) < 23:
+        if args.replay_da > 0 and MOD_PATTERN["DA"] in replayed and len(active) < 23:
             pulses.append(ModPulse("DA", t_s, 60.0 * args.replay_da, args.replay_da_amp))
             ev["da"] = True
         print(f"t={t_s / 3600:.2f} h  active {len(active):2d}  replayed {replayed}", flush=True)
@@ -196,7 +199,7 @@ def main():
             suffix = f"_mod{args.mod_min:g}" + suffix
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
-            pickle.dump(dict(seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
+            pickle.dump(dict(layout=LAYOUT, seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
                              pulses=[p.__dict__ for p in pulses], slow_t=np.array(slow["t"]),
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]),
                              slow_G=np.array(slow["G"]), gate=args.gate, events=events,
@@ -209,7 +212,7 @@ def main():
                         slow_M_DA=np.array(slow["M_DA"]), slow_M_5HT=np.array(slow["M_5HT"]),
                         p1_pre=circ.p1_pre, p1_post=circ.p1_post)
     with open(OUT / "pilot_events.pkl", "wb") as f:
-        pickle.dump(dict(enc=dict(t=enc["t"], spikes=enc["spikes"], v=enc["v"], Tt_trace=enc["Tt_trace"]),
+        pickle.dump(dict(layout=LAYOUT, enc=dict(t=enc["t"], spikes=enc["spikes"], v=enc["v"], Tt_trace=enc["Tt_trace"]),
                          enc_on=enc_on, t_enc_ms=t_enc_ms, slow_Tt=slow["Tt"], slow_z=slow["z"], events=events,
                          snapshots=snapshots, pulses=[p.__dict__ for p in pulses], params=cp.__dict__,
                          stc_params=sp.__dict__, masks={k: m for k, m in masks.items()}), f)

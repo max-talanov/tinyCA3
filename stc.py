@@ -3,7 +3,7 @@
 Pool granularity "cell": one PRP pool P_j per postsynaptic PYR (implementation plan Table 2 of the algorithm doc).
     tau_P dP_j/dt = -P_j + alpha_P * Theta[ sum_{s -> j} |Tt_s| - theta_pro(M_j) ],  theta_pro(M) = theta0 / (M + 0.001)
 (Luboeinski & Tetzlaff 2021 Eq. 15; Lehr et al. 2022 Eq. 10). M_j is the modulator reaching cell j: DA reaches the cells
-of Λ, 5-HT the cells of V (architecture doc, "Mapping of the modulators"), each as rectangular pulses.
+of X (v1: Λ), 5-HT the cells of + (v1: V) (architecture doc, "Mapping of the modulators"), each as rectangular pulses.
 Synthesis trigger (tau_G_min > 0, report of 2026-11-24): the modulator does not set theta_pro directly. It switches on
 a per-cell synthesis state G_j (the D1/D5 / 5-HT receptor -> cAMP/PKA -> translation step), which then outlasts it:
     dG_j/dt = M_j (1 - G_j) / tau_on - G_j / tau_G,   theta_pro = theta0 / (G_j + 0.001)
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from circuit import CELL_IDS, IDX, PATTERNS
+from circuit import CELL_IDS, IDX, MOD_PATTERN, PATTERNS
 from reference.stc_numpy import advance_slow
 
 
@@ -40,7 +40,7 @@ class ModPulse:
     amp: float = 1.0
 
 
-MOD_CELLS = {"DA": set(PATTERNS["Λ"]), "5-HT": set(PATTERNS["V"])}
+MOD_CELLS = {m: set(PATTERNS[k]) for m, k in MOD_PATTERN.items()}   # v1: Λ and V; layout B: X and +
 
 
 def modulator_at(pulses, t_s):

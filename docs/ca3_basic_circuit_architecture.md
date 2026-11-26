@@ -1,16 +1,16 @@
 # tinyCA3: architecture of the basic circuit
 
-Nov 11, 2026 · Max Talanov
+Nov 11, 2026 · Max Talanov · updated Nov 26, 2026: pattern layout B (the corrected figure), see [the update plan](architecture_update_plan_2026-11-26.md)
 
 ## The main idea
 
 tinyCA3 is a heavily simplified CA3 auto-associative network used to test synaptic tagging and capture in a recurrent circuit. It has 25 pyramidal cells connected all-to-all in both directions, and 25 basket cells that give global feedback inhibition. Entorhinal (EC) and dentate gyrus (DG) inputs select which pyramidal cells fire together. Dopamine (DA) and serotonin (5-HT) projections mark some of these patterns, so that only their recurrent synapses can turn a tag into a lasting weight. A CA3 → EC projection closes the loop and lets stored patterns be replayed.
 
-The plasticity rules come from the [up/down-scaling model of November 2026](https://github.com/max-talanov/tinyHippo-bio-plasticity/blob/main/docs/plasticity_up_down_model_2026-11-06.md) (here called *the plasticity model*). That model is one CA1 pyramidal cell; tinyCA3 carries its three levels (release, tag, stored weight) over to the CA3 recurrent synapses. Like the plasticity model, tinyCA3 is a specification: nothing below is built yet.
+The plasticity rules come from the [up/down-scaling model of November 2026](https://github.com/max-talanov/tinyHippo-bio-plasticity/blob/main/docs/plasticity_up_down_model_2026-11-06.md) (here called *the plasticity model*). That model is one CA1 pyramidal cell; tinyCA3 carries its three levels (release, tag, stored weight) over to the CA3 recurrent synapses. The circuit is built in `circuit.py`.
 
 ![The six input patterns of the basic CA3 circuit](figs/CA3_basic_circuit.png)
 
-**Figure 1.** The basic circuit, shown six times with a different pattern selected in each panel. Blue: basket cells; orange: pyramidal cells, dark orange when the pattern recruits them. Each panel shows one EC → DG pair and, where present, the neuromodulatory source. The six panels show one network, not six.
+**Figure 1.** The basic circuit (corrected version of 2026-11-26), shown six times with a different pattern selected in each panel. Blue: basket cells; orange: pyramidal cells, dark orange when the pattern recruits them. Each panel shows one EC → DG pair and, where present, the neuromodulatory source. The six panels show one network, not six.
 
 ## Acronyms and abbreviations
 
@@ -49,6 +49,7 @@ The network has 64 units in five groups (Table 1). Cells are indexed by their pl
 - In row 1, the third pyramidal cell is labelled `ex1.1`; it is `ex_13`.
 - The basket-cell column shows `in1.1 … in1.5`, then `in2.1 … ex2.5` and so on. Each basket block holds 25 cells `in_11` … `in_55`; the `ex` labels on the right are slips.
 - The bottom-right panel is labelled `EC5`/`DG5`, the same as the bottom-left one, although it shows a different pattern. It is read here as `EC_6`/`DG_6`.
+- The small arrow from `ex2.3` to `ex3.3` in panel 2 marks the cell added in the corrected figure; it is not a projection.
 
 ## Projections
 
@@ -62,7 +63,7 @@ There are seven projection types (Table 2, Figure 2). All synapses are Tsodyks�
 | P2 | PYR → BC | 1:1, `ex_ij → in_ij` | 25 | + | Release only | Red arrow, "1:1" |
 | P3 | BC → PYR | 1:ALL, `in_ij →` every `ex_kl` | 25 × 25 = 625, or 600 without self-inhibition | − | Release only | Blue arrow, "1:ALL" |
 | P4 | EC_k → DG_k | 1:1 per pattern | 6 | + | No | Red arrow EC → DG |
-| P5 | DG_k → PYR (MF) | DG_k → every cell of pattern k | 9 to 19 per pattern (Table 3) | + | No | Red arrow DG → CA3 |
+| P5 | DG_k → PYR (MF) | DG_k → every cell of pattern k | 4 to 16 per pattern (Table 3) | + | No | Red arrow DG → CA3 |
 | P6 | PYR → EC (replay feedback) | Pattern k → EC_k (proposed) | One per cell per pattern it belongs to | + | No | Red arrow CA3 → EC |
 | P7 | DA, 5-HT → P1 synapses | Volume signal onto the synapses inside the modulated pattern | Not synaptic; a scalar per synapse | Modulatory | Gates tag and capture | Purple arrows into CA3 |
 
@@ -74,8 +75,8 @@ flowchart LR
     PYR -->|"P2 1:1"| BC["CA3 BC in_11 … in_55"]
     BC -.->|"P3 1:ALL, GABA_A"| PYR
     PYR -->|"P6 replay feedback"| EC
-    DA(["DA"]) ==>|"P7 on Λ synapses"| PYR
-    HT(["5-HT"]) ==>|"P7 on V synapses"| PYR
+    DA(["DA"]) ==>|"P7 on X cells"| PYR
+    HT(["5-HT"]) ==>|"P7 on + cells"| PYR
 ```
 
 **Figure 2.** Projections of the basic circuit. Solid: excitatory; dotted: inhibitory; thick: neuromodulatory.
@@ -104,37 +105,49 @@ The figure draws one arrow from the whole CA3 block to EC, so the mapping is not
 
 ## The six patterns
 
-DG selects six patterns on the 5 × 5 grid (Table 3, Figure 3). They are built from four basic shapes: Λ, V, a vertical bar I and a square frame O. Patterns 5 and 6 are unions of the basic ones. The shapes below are read from the figure; `#` marks a recruited cell.
+DG selects six patterns on the 5 × 5 grid (Table 3, Figure 3), read cell by cell from the corrected figure. Patterns 1 to 4 are the basic patterns, and they are disjoint: every pyramidal cell belongs to exactly one of them (4 + 5 + 10 + 6 = 25). Patterns 5 and 6 are combinations of two basic patterns of the same kind: the two modulated ones, and the two unmodulated ones. `#` marks a recruited cell.
 
-**Table 3.** The six patterns: cells, size, recurrent synapses inside the pattern and neuromodulation.
+**Table 3.** The six patterns (layout B): cells, size, recurrent synapses inside the pattern and neuromodulation.
 
 | k | Shape | Cells | n | Synapses n(n − 1) | Modulator |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Λ | 13; 22, 24; 32, 34; 41, 45; 51, 55 | 9 | 72 | DA |
-| 2 | V | 11, 15; 21, 25; 32, 34; 42, 44; 53 | 9 | 72 | 5-HT |
-| 3 | I (column 3) | 13, 23, 33, 43, 53 | 5 | 20 | None |
-| 4 | O (border) | rows 1 and 5, columns 1 and 5 | 16 | 240 | None |
-| 5 | Λ ∪ V | union of patterns 1 and 2 | 16 | 240 | DA and 5-HT |
-| 6 | Λ ∪ V ∪ I | union of patterns 1, 2 and 3 | 19 | 342 | DA and 5-HT |
+| 1 | X (inner corners) | 22, 24, 42, 44 | 4 | 12 | DA |
+| 2 | + (inner cross) | 23, 32, 33, 34, 43 | 5 | 20 | 5-HT |
+| 3 | = (rows 1 and 5) | 11–15, 51–55 | 10 | 90 | None |
+| 4 | ‖ (columns 1 and 5, rows 2–4) | 21, 31, 41, 25, 35, 45 | 6 | 30 | None |
+| 5 | X∪+ (inner 3 × 3 block) | patterns 1 and 2 | 9 | 72 | DA and 5-HT |
+| 6 | =∪‖ (border) | patterns 3 and 4 | 16 | 240 | None |
 
 ```text
- 1  Λ  +DA     2  V  +5-HT    3  I          4  O          5  Λ∪V  +DA+5-HT   6  Λ∪V∪I  +DA+5-HT
- . . # . .     # . . . #      . . # . .     # # # # #     # . # . #          # . # . #
- . # . # .     # . . . #      . . # . .     # . . . #     # # . # #          # # # # #
- . # . # .     . # . # .      . . # . .     # . . . #     . # . # .          . # # # .
- # . . . #     . # . # .      . . # . .     # . . . #     # # . # #          # # # # #
- # . . . #     . . # . .      . . # . .     # # # # #     # . # . #          # . # . #
+ 1  X  +DA     2  +  +5-HT    3  =          4  ‖          5  X∪+  +DA+5-HT   6  =∪‖
+ . . . . .     . . . . .      # # # # #     . . . . .     . . . . .          # # # # #
+ . # . # .     . . # . .      . . . . .     # . . . #     . # # # .          # . . . #
+ . . . . .     . # # # .      . . . . .     # . . . #     . # # # .          # . . . #
+ . # . # .     . . # . .      . . . . .     # . . . #     . # # # .          # . . . #
+ . . . . .     . . . . .      # # # # #     . . . . .     . . . . .          # # # # #
 ```
 
 **Figure 3.** The six patterns on the grid, rows 1 to 5 from the top.
 
-**Overlaps.** The patterns share cells, so they share recurrent synapses and compete through the inhibition.
+**No overlaps.** The basic patterns share no cell. Two patterns share cells only when one is a combination that contains the other. In particular, no cell of = or ‖ ever receives DA or 5-HT, and no synapse receives both modulators.
 
-- Λ and V share `ex_32` and `ex_34`; the two synapses between these cells belong to both patterns and receive both DA and 5-HT.
-- I shares `ex_13` with Λ and `ex_53` with V.
-- O shares 5 cells with Λ (13, 41, 45, 51, 55) and 4 with V (11, 15, 21, 25).
+**Synapse classes.** Because the basic patterns are disjoint, each of the 600 recurrent synapses falls into one class (Table 3a). Each modulated class has an unmodulated twin with the same tagging history, so the difference between twins is the effect of PRP availability alone.
 
-**Mapping of the modulators.** DA modulates the Λ pattern (panel EC1) and 5-HT the V pattern (panel EC2), as drawn in the figure. Patterns 5 and 6 contain both shapes and receive both modulators.
+**Table 3a.** Classes of the P1 synapses (`circuit.synapse_class`).
+
+| Class | Count | Tagged at encoding by | Twin |
+| --- | --- | --- | --- |
+| X | 12 | Patterns 1 and 5 | = |
+| + | 20 | Patterns 2 and 5 | ‖ |
+| X→+, +→X | 20 + 20 | Pattern 5 only | =→‖, ‖→= |
+| = | 90 | Patterns 3 and 6 | X |
+| ‖ | 30 | Patterns 4 and 6 | + |
+| =→‖, ‖→= | 60 + 60 | Pattern 6 only | X→+, +→X |
+| none: (X ∪ +) ↔ (= ∪ ‖) | 144 + 144 | No co-activity; a weaker tag from postsynaptic firing alone (calcium rule) | — |
+
+**Mapping of the modulators.** DA modulates the X pattern (panel EC1) and 5-HT the + pattern (panel EC2), as drawn in the figure. Pattern 5 contains both and receives both modulators; a synapse in it gets the modulator of its postsynaptic cell.
+
+**Earlier layout (v1).** Until 2026-11-26 the patterns were read as Λ, V, a vertical bar I and the border O. That reading did not match the figure, and its patterns shared cells: Λ and V shared 32 and 34, and 40% of the I synapses and 62% of the O synapses ended on a Λ or V cell, so the unmodulated controls could capture. The reports of 2026-11-17 to 2026-11-24 use v1, which stays selectable with `TINYCA3_LAYOUT=v1`.
 
 ## Plasticity
 
@@ -156,7 +169,7 @@ The stored weight of one recurrent synapse enters each spike as in Eq. 16 of the
 
 The plasticity model leaves the PRP trigger open, and names strong input with dopamine D1/D5 signalling as the candidate (its limit 4; Huang & Kandel 1995; Moncada & Viola 2007). tinyCA3 makes this the rule: tagging is set by co-activity alone, but capture needs a neuromodulatory signal at the synapse.
 
-Each source m ∈ {DA, 5-HT} releases a scalar signal M_m(t) during the presentation of its patterns. It reaches the P1 synapses whose two cells both belong to a pattern that m modulates; this set is S_m. The proposed form makes M_m the protein-synthesis gate s(t) of the plasticity model, separately for each source:
+Each source m ∈ {DA, 5-HT} releases a scalar signal M_m(t) from the presentation of its pattern. It reaches the cells of that pattern (X for DA, + for 5-HT), and so the P1 synapses that end on them; this set is S_m. The proposed form makes M_m the protein-synthesis gate s(t) of the plasticity model, separately for each source:
 
 ```math
 \frac{dP_j}{dt} = -\frac{P_j}{\tau_P} + \Delta P \sum_{m} \kappa_m\, M_m(t)\, \mathbb{1}[\,j \in S_m\,] \quad \text{(proposed)} \qquad (2)
@@ -164,32 +177,32 @@ Each source m ∈ {DA, 5-HT} releases a scalar signal M_m(t) during the presenta
 
 Here j is a recurrent synapse (or the dendritic compartment that holds it), and κ_m scales each source. Capture then runs as in Eq. 4 of the plasticity model, with h(P_j). Three consequences follow:
 
-- Synapses of Λ capture only with DA, and synapses of V only with 5-HT. The two synapses between `ex_32` and `ex_34` receive both.
-- Synapses of I and O are tagged when their patterns are presented but get no PRPs of their own, so their tags decay (D8). They are the unmodulated controls.
+- Synapses onto X cells capture only with DA, and synapses onto + cells only with 5-HT. No synapse receives both.
+- Synapses of = and ‖ are tagged when their patterns are presented but get no PRPs, so their tags decay (D8). They are the unmodulated controls, and no cell of theirs is ever reached by a modulator.
 - DA and 5-HT may act through different pathways and with different strengths; κ_DA and κ_5HT are set apart. The model makes no claim about a specific 5-HT receptor: 5-HT here is a second, independent gate, and its biology must be sourced before any parameter is fixed.
 
 The alternative reading, that the modulator also sets or scales the tag itself, is kept as a switch (`modulate_tag`) to compare against.
 
 ### What the six patterns test
 
-Read this way, the patterns form a small experiment (Table 4).
+Read this way, the patterns form a small experiment with matched controls (Table 4).
 
 **Table 4.** Expected outcome per pattern under Eq. 2, with tagging by co-activity and capture gated by the modulator.
 
 | k | Pattern | Tag | PRPs | Expected stored weight | What it tests |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Λ | Yes | DA | Captured | Capture with DA |
-| 2 | V | Yes | 5-HT | Captured | Capture with 5-HT |
-| 3 | I | Yes | None | Decays to w_0 | Tag without capture |
-| 4 | O | Yes | None | Decays to w_0 | Same, with a large pattern that overlaps Λ and V |
-| 5 | Λ ∪ V | Yes | DA and 5-HT | Captured, including the synapses between Λ and V cells | Joint modulation; synapses linking the two halves |
-| 6 | Λ ∪ V ∪ I | Yes | DA and 5-HT | Λ and V captured; I captured only if PRPs are shared | Whether an unmodulated input can capture from modulated neighbours |
+| 1 | X | Yes | DA | Captured | Capture with DA |
+| 2 | + | Yes | 5-HT | Captured | Capture with 5-HT |
+| 3 | = | Yes | None | Decays to w_0 | Tag without capture: the control for X |
+| 4 | ‖ | Yes | None | Decays to w_0 | Tag without capture: the control for + |
+| 5 | X∪+ | Yes | DA and 5-HT | Captured, including the cross synapses X ↔ + | Capture of synapses tagged once, between two modulated patterns |
+| 6 | =∪‖ | Yes | None | Decays to w_0, including the cross synapses = ↔ ‖ | The control for pattern 5 |
 
-Pattern 6 is the key case. If PRPs are local to each synapse, the I synapses stay uncaptured, as in pattern 3. If PRPs are shared within a compartment, as in the Frey–Morris design (point 7 of the plasticity model), the I synapses that share compartments with modulated ones capture as well. With a limited pool (D9, Eq. 11 of the plasticity model), they compete with Λ and V instead. Pattern 6 therefore separates these three PRP-pool hypotheses.
+Under per-cell PRPs the outcome of every synapse is set by its postsynaptic cell. If PRPs were shared beyond the cell (the Frey–Morris design, point 7 of the plasticity model), the controls would still not capture, since no control cell is near a modulated one in the model; a test of shared PRPs needs a mixed combination (for example X∪‖), which layout B leaves out on purpose.
 
 ### Replay and selection
 
-Replay through P6 reactivates stored patterns while their tags are still alive. In the plasticity model, replay may both store and select (its point 8): what is replayed is captured, and the rest is depressed (D3, Eq. 12). In tinyCA3 this becomes testable in a closed loop. A strongly captured pattern completes from a partial cue, re-drives its EC unit and is replayed; an uncaptured one does not. If SWR-triggered depression (D3) is added, the synapses of patterns that are not replayed, such as I and O, are weakened, so selection is a result of the circuit and not an imposed rule.
+Replay through P6 reactivates stored patterns while their tags are still alive. In the plasticity model, replay may both store and select (its point 8): what is replayed is captured, and the rest is depressed (D3, Eq. 12). In tinyCA3 this becomes testable in a closed loop. A strongly captured pattern completes from a partial cue, re-drives its EC unit and is replayed; an uncaptured one does not. If SWR-triggered depression (D3) is added, the synapses of patterns that are not replayed, such as = and ‖, are weakened, so selection is a result of the circuit and not an imposed rule.
 
 ## Limits and open choices
 
@@ -201,7 +214,8 @@ Replay through P6 reactivates stored patterns while their tags are still alive. 
 6. **No perforant path.** EC reaches CA3 only through DG, so recall from EC without DG is not possible yet.
 7. **PRP gate.** Eq. 2 is our proposal. DA as a PRP trigger has support (Moncada & Viola 2007); the role given to 5-HT has no source in this document yet.
 8. **Inherited gaps.** All the limits of the plasticity model hold here: one tag type, no upper bound on w_cap, unsourced α, k_cap, n_H, τ_P, and the STP parameters taken from CA1 and rat data rather than CA3.
+9. **Small modulated patterns.** X and + have 4 and 5 cells, fewer than the controls (10 and 6). Compare weights per synapse class, not per pattern total.
 
 ## Sources
 
-The plasticity levels, equations and pathway numbers (U1–U8, D1–D13, Eqs. 1–16) come from [`plasticity_up_down_model_2026-11-06.md`](https://github.com/max-talanov/tinyHippo-bio-plasticity/blob/main/docs/plasticity_up_down_model_2026-11-06.md) in [max-talanov/tinyHippo-bio-plasticity](https://github.com/max-talanov/tinyHippo-bio-plasticity); references cited here by author and year are listed there. The circuit and patterns come from [`figs/CA3_basic_circuit.png`](figs/CA3_basic_circuit.png); the patterns were read from the pixel colours of the figure.
+The plasticity levels, equations and pathway numbers (U1–U8, D1–D13, Eqs. 1–16) come from [`plasticity_up_down_model_2026-11-06.md`](https://github.com/max-talanov/tinyHippo-bio-plasticity/blob/main/docs/plasticity_up_down_model_2026-11-06.md) in [max-talanov/tinyHippo-bio-plasticity](https://github.com/max-talanov/tinyHippo-bio-plasticity); references cited here by author and year are listed there. The circuit and patterns come from [`figs/CA3_basic_circuit.png`](figs/CA3_basic_circuit.png) (corrected 2026-11-26); the patterns were checked cell by cell against the figure.

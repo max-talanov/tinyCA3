@@ -12,11 +12,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
 
-from circuit import PATTERN_ORDER, CircuitParams  # noqa: E402
+from circuit import PA, PATTERN_ORDER, PB, PCOL, RESULTS, CircuitParams  # noqa: E402
 from run_pilot import ENC_START_MS, ENC_STEP_MS, EPOCHS_H, EVENT_GAP_S, EVENT_MS, N_EVENTS, SWR_AT_MS  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
+RES = RESULTS
 C_DA, C_HT, C_REP, C_OFF, C_ENC = "#c0392b", "#2e6fd8", "#e67e22", "#d9d9d9", "#555555"
 MOD_MIN = 10.0          # bio-plausible modulator duration of the protocol (alternatives drawn: 5 and 60 min)
 TAU_P_MIN = 60.0
@@ -39,14 +38,14 @@ def main():
 
     # (a) whole run --------------------------------------------------------------------------------------------
     ax = fig.add_subplot(gs[0, :])
-    rows = {"encoding": 3, "DA → Λ cells": 2, "5-HT → V cells": 1.4, "replay epochs": 0.6, "offline STC": -0.2}
+    rows = {"encoding": 3, f"DA → {PA} cells": 2, f"5-HT → {PB} cells": 1.4, "replay epochs": 0.6, "offline STC": -0.2}
     lane(ax, rows["offline STC"], 0, 8, C_OFF)
     ax.plot([t_enc_s / 3600] * 2, [2.7, 3.3], color=C_ENC, lw=3)
     ax.text(0.05, 3, "14.1 s, six patterns (c)", va="center", fontsize=7)
     for d, ls, a in ((MOD_MIN, "-", 1), (60, ":", 0.35)):
-        lane(ax, rows["DA → Λ cells"], on["Λ"] / 3600, on["Λ"] / 3600 + d / 60, C_DA, alpha=a, h=0.4)
-        lane(ax, rows["5-HT → V cells"], on["V"] / 3600, on["V"] / 3600 + d / 60, C_HT, alpha=a, h=0.4)
-    ax.text(1.05, rows["DA → Λ cells"], f"released {MOD_MIN:g} min (solid) + synthesis trigger; 60 min L&T form (pale)",
+        lane(ax, rows[f"DA → {PA} cells"], on[PA] / 3600, on[PA] / 3600 + d / 60, C_DA, alpha=a, h=0.4)
+        lane(ax, rows[f"5-HT → {PB} cells"], on[PB] / 3600, on[PB] / 3600 + d / 60, C_HT, alpha=a, h=0.4)
+    ax.text(1.05, rows[f"DA → {PA} cells"], f"released {MOD_MIN:g} min (solid) + synthesis trigger; 60 min L&T form (pale)",
             va="center", fontsize=6.5)
     for i, e in enumerate(EPOCHS_H):
         lane(ax, rows["replay epochs"], e, e + N_EVENTS * EVENT_GAP_S / 3600, C_REP)
@@ -98,9 +97,9 @@ def main():
             t0 = on[k] + b * 0.5
             lane(ax, y, t0, t0 + 0.1, PCOL[k], h=0.55)
         ax.text(on[k] + 1.25, y, f"EC_{k}", va="center", fontsize=6.5, color=PCOL[k])
-    ax.annotate("DA on", (on["Λ"], 7.0), (on["Λ"], 7.7), color=C_DA, fontsize=6.5, ha="center",
+    ax.annotate("DA on", (on[PA], 7.0), (on[PA], 7.7), color=C_DA, fontsize=6.5, ha="center",
                 arrowprops=dict(arrowstyle="->", color=C_DA, lw=0.8))
-    ax.annotate("5-HT on", (on["V"], 7.0), (on["V"], 7.7), color=C_HT, fontsize=6.5, ha="center",
+    ax.annotate("5-HT on", (on[PB], 7.0), (on[PB], 7.7), color=C_HT, fontsize=6.5, ha="center",
                 arrowprops=dict(arrowstyle="->", color=C_HT, lw=0.8))
     ax.set_yticks([])
     ax.set_xlim(0, t_enc_s)

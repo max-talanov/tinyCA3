@@ -15,15 +15,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import PATTERN_ORDER  # noqa: E402
+from circuit import MODULATED, P6, PA, PAB, PB, RESULTS, PATTERN_ORDER  # noqa: E402
 from prp_stats import EPOCHS_H, PCOL, SEEDS, TOL, epoch_counts, w_at, w_final  # noqa: E402
 from replay_stats import ALPHA, BURST, p_chance  # noqa: E402
 from stc_compare import load  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 COND = {"60 min": "", "10 min": "_mod10", "5 min": "_mod5", "PRP block": "_prpblock"}
 LS = {"60 min": "-", "10 min": "--", "5 min": "-.", "PRP block": ":"}
-MODULATED = ("Λ", "V", "Λ∪V", "Λ∪V∪I")
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
 
 
@@ -71,16 +70,16 @@ def main():
     ax = axes[0]
     tg = np.linspace(0.004, 8, 500)
     for c in COND:
-        for k in ("Λ", "V"):
+        for k in (PA, PB):
             ws = np.array([w_at(runs[c][sd], k, tg) for sd in SEEDS]).mean(0)
-            ax.plot(tg, ws, color=PCOL[k], ls=LS[c], lw=1.2, label=c if k == "Λ" else None)
+            ax.plot(tg, ws, color=PCOL[k], ls=LS[c], lw=1.2, label=c if k == PA else None)
     for e in EPOCHS_H:
         ax.axvspan(e, e + 0.5, color="#999", alpha=0.12, lw=0)
     ax.axhline(TOL, color="k", lw=0.6, ls=":")
     ax.text(8, TOL, "w0 + 10%", ha="right", va="bottom", fontsize=6.5)
     ax.set_xlabel("time (h)")
     ax.set_ylabel("mean 1 + T̃ + z inside the pattern")
-    ax.set_title("Λ (red) and V (blue), mean of 5 seeds", fontsize=8)
+    ax.set_title(f"{PA} (red) and {PB} (blue), mean of 5 seeds", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5, title="DA / 5-HT on for", title_fontsize=6.5)
 
     ax = axes[1]
@@ -107,7 +106,7 @@ def main():
         ax.plot(range(4), chn, marker="o", ms=3, ls=LS[c], color="#bbbbbb", mfc="white")
     ax.plot([], [], color="#bbbbbb", marker="o", ms=3, mfc="white", label="chance (same style)")
     ax.set_xticks(range(4), [f"{e:g}–{e + 0.5:g} h" for e in EPOCHS_H])
-    ax.set_ylabel("replays of Λ, V, Λ∪V, Λ∪V∪I\n(sum over 5 seeds × 20 events)")
+    ax.set_ylabel(f"replays of {', '.join(MODULATED)}\n(sum over 5 seeds × 20 events)")
     ax.set_title("modulated patterns, per epoch", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5)
     for i, a in enumerate(axes):

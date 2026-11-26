@@ -17,20 +17,20 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import PATTERN_ORDER, PATTERNS, IDX  # noqa: E402
+from circuit import MODULATED, PA, PATTERNS, PATTERN_ORDER, PB, PC, RESULTS, IDX  # noqa: E402
 from mod_stats import MODULATED, significant  # noqa: E402
 from prp_stats import EPOCHS_H, PCOL, SEEDS, TOL, epoch_counts, w_at, w_final  # noqa: E402
 from replay_stats import BURST  # noqa: E402
 from stc import ModPulse, STCParams, advance, modulator_at, tag_sum_per_cell  # noqa: E402
 from stc_compare import load  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 COND = {"L&T 60 min": "", "10 min, no trigger": "_mod10", "10 min + trigger": "_mod10_gate30",
         "5 min + trigger": "_mod5_gate30", "PRP block": "_prpblock"}
 STY = {"L&T 60 min": dict(color="k", ls="-"), "10 min, no trigger": dict(color="#999999", ls="--"),
        "10 min + trigger": dict(color="#d35400", ls="-"), "5 min + trigger": dict(color="#d35400", ls="-."),
        "PRP block": dict(color="#999999", ls=":")}
-LAM = [IDX[c] for c in PATTERNS["Λ"]]
+LAM = [IDX[c] for c in PATTERNS[PA]]
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
 
 
@@ -41,7 +41,7 @@ def offline_sweep():
     for rel, g in ((60, 0), (10, 0), (5, 0), (10, 15), (10, 30), (10, 45), (10, 60), (5, 30), (2, 30)):
         sp = STCParams(tau_G_min=g)
         pulses = [ModPulse("DA", 0.3, 60.0 * rel), ModPulse("5-HT", 2.6, 60.0 * rel)]
-        zs, ends = {k: [] for k in ("Λ", "V", "I")}, []
+        zs, ends = {k: [] for k in (PA, PB, PC)}, []
         for sd in SEEDS:
             d = load(sd)
             t0, Tt0 = d["snapshots"]["end of encoding"]
@@ -106,7 +106,7 @@ def main():
     ax.axvspan(0, 10, color="#c0392b", alpha=0.12, lw=0)
     ax.text(5, 1.02, "DA\n10 min", ha="center", va="top", fontsize=6.5, color="#c0392b")
     ax.set_xlabel("time (min)")
-    ax.set_ylabel("Λ cells, mean (seed 1)")
+    ax.set_ylabel(f"{PA} cells, mean (seed 1)")
     ax.set_ylim(0, 1.05)
     ax.set_title("PRP pool P (warm) and synthesis trigger G (blue)", fontsize=8)
     ax.legend(frameon=False, fontsize=6, loc="upper right")
@@ -114,15 +114,15 @@ def main():
     ax = axes[0, 1]
     tg = np.linspace(0.004, 8, 500)
     for c in COND:
-        ws = np.array([w_at(runs[c][sd], "Λ", tg) for sd in SEEDS]).mean(0)
+        ws = np.array([w_at(runs[c][sd], PA, tg) for sd in SEEDS]).mean(0)
         ax.plot(tg, ws, lw=1.3, label=c, **STY[c])
     for e in EPOCHS_H:
         ax.axvspan(e, e + 0.5, color="#999", alpha=0.12, lw=0)
     ax.axhline(TOL, color="k", lw=0.6, ls=":")
     ax.text(8, TOL, "w0 + 10%", ha="right", va="bottom", fontsize=6.5)
     ax.set_xlabel("time (h)")
-    ax.set_ylabel("mean 1 + T̃ + z inside Λ")
-    ax.set_title("weight of Λ, mean of 5 seeds", fontsize=8)
+    ax.set_ylabel(f"mean 1 + T̃ + z inside {PA}")
+    ax.set_title(f"weight of {PA}, mean of 5 seeds", fontsize=8)
     ax.legend(frameon=False, fontsize=6)
 
     ax = axes[1, 0]
@@ -152,7 +152,7 @@ def main():
         ax.plot(range(4), chn, marker="o", ms=2.5, lw=0.8, color="#cccccc", ls=STY[c]["ls"], mfc="white")
     ax.plot([], [], color="#cccccc", marker="o", ms=2.5, mfc="white", label="chance (same line style)")
     ax.set_xticks(range(4), [f"{e:g}–{e + 0.5:g} h" for e in EPOCHS_H])
-    ax.set_ylabel("replays of Λ, V, Λ∪V, Λ∪V∪I\n(sum over 5 seeds × 20 events)")
+    ax.set_ylabel(f"replays of {', '.join(MODULATED)}\n(sum over 5 seeds × 20 events)")
     ax.set_title("modulated patterns, per epoch", fontsize=8)
     ax.set_ylim(0, 31)
     ax.legend(frameon=False, fontsize=6, ncol=2, loc="upper right")

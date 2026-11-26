@@ -16,9 +16,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import IDX, PATTERN_ORDER, PATTERNS  # noqa: E402
+from circuit import IDX, PA, PATTERN_ORDER, RESULTS, PATTERNS  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 SEEDS = (1, 2, 3, 4, 5)
 COND = {"no DA": "_noencda", "replay DA": "_noencda_rda10", "encoding DA": ""}
 CCOL = {"no DA": "#7f7f7f", "replay DA": "#c0392b", "encoding DA": "#e9a3a3"}
@@ -31,11 +31,11 @@ def load(seed, suffix):
 
 def main():
     data = {c: {sd: load(sd, suf) for sd in SEEDS} for c, suf in COND.items()}
-    lam = [IDX[c] for c in PATTERNS["Λ"]]
+    lam = [IDX[c] for c in PATTERNS[PA]]
     z = {c: {sd: {k: float(np.mean(d["z_final"][d["masks"][k]])) for k in PATTERN_ORDER}
              for sd, d in dd.items()} for c, dd in data.items()}
     da_events = {sd: [round(e["t_s"] / 3600, 2) for e in data["replay DA"][sd]["events"] if e.get("da")] for sd in SEEDS}
-    lam_rep = {c: {sd: sum(1 for e in data[c][sd]["events"] if "Λ" in e["replayed"] and e["n_active"] < 23)
+    lam_rep = {c: {sd: sum(1 for e in data[c][sd]["events"] if PA in e["replayed"] and e["n_active"] < 23)
                    for sd in SEEDS} for c in COND}
     summary = {}
     for k in PATTERN_ORDER:
@@ -50,7 +50,7 @@ def main():
         print(f"{k:6s} z noDA {s['z_no DA']:.3f}  replayDA {s['z_replay DA']:.3f}  encDA {s['z_encoding DA']:.3f}  "
               f"Δ {s['d_mean']:+.3f}±{s['d_sd']:.3f} ({s['seeds_d_pos']}/5 >0)")
     print("DA events (h):", da_events)
-    print("Λ replays per run:", lam_rep)
+    print(f"{PA} replays per run:", lam_rep)
 
     plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
     fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.0), gridspec_kw=dict(width_ratios=[1.2, 1.2, 1]))
@@ -69,22 +69,22 @@ def main():
     for c in ("no DA", "replay DA"):
         for sd in SEEDS:
             d = data[c][sd]
-            ax.plot(np.array(d["slow_t"]) / 3600, [v["Λ"] for v in d["slow_z"]], color=CCOL[c], lw=0.8,
+            ax.plot(np.array(d["slow_t"]) / 3600, [v[PA] for v in d["slow_z"]], color=CCOL[c], lw=0.8,
                     label=c if sd == 1 else None)
     for sd in SEEDS:
         for t in da_events[sd]:
             ax.axvline(t, color=CCOL["replay DA"], lw=0.4, alpha=0.4)
     ax.set_xlabel("time after encoding (h)")
-    ax.set_ylabel("mean z of Λ")
+    ax.set_ylabel(f"mean z of {PA}")
     ax.legend(frameon=False, fontsize=7)
-    ax.set_title("capture of Λ (vertical lines: replay DA events)", fontsize=8)
+    ax.set_title(f"capture of {PA} (vertical lines: replay DA events)", fontsize=8)
     ax = axes[2]
     for sd in SEEDS:
         d = data["replay DA"][sd]
         t = np.array(d["slow_t"]) / 3600
         ax.plot(t, np.array(d["slow_P"])[:, lam].mean(axis=1), lw=0.8, label=f"seed {sd} ({len(da_events[sd])} DA)")
     ax.set_xlabel("time after encoding (h)")
-    ax.set_ylabel("PRP pool P of Λ cells")
+    ax.set_ylabel(f"PRP pool P of {PA} cells")
     ax.legend(frameon=False, fontsize=6)
     ax.set_title("PRPs made by replay DA", fontsize=8)
     for i, a_ in enumerate(axes):

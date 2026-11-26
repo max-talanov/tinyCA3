@@ -10,25 +10,84 @@ Projections (implementation plan Table 3):
   P8 SWT -> PYR    every trigger cell to every PYR, AMPA only, jittered delays
 Every weight is a pilot value (status free) chosen by calibrate_pilot.py; none is a CA3 measurement.
 """
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
 from cells import BCParams, PyrParams, build_bc, build_pyr, build_rs, h
 
-# Patterns read from the architecture doc Table 3 (cell = 10*row + column).
-PATTERNS = {
-    "Λ": (13, 22, 24, 32, 34, 41, 45, 51, 55),
-    "V": (11, 15, 21, 25, 32, 34, 42, 44, 53),
-    "I": (13, 23, 33, 43, 53),
-    "O": tuple(sorted({10 * r + c for r in range(1, 6) for c in range(1, 6) if r in (1, 5) or c in (1, 5)})),
-}
-PATTERNS["Λ∪V"] = tuple(sorted(set(PATTERNS["Λ"]) | set(PATTERNS["V"])))
-PATTERNS["Λ∪V∪I"] = tuple(sorted(set(PATTERNS["Λ∪V"]) | set(PATTERNS["I"])))
-PATTERN_ORDER = ("Λ", "V", "I", "O", "Λ∪V", "Λ∪V∪I")
-MODULATOR_OF = {"Λ": "DA", "V": "5-HT", "Λ∪V": "DA+5-HT", "Λ∪V∪I": "DA+5-HT"}
 CELL_IDS = tuple(10 * r + c for r in range(1, 6) for c in range(1, 6))
 IDX = {cid: i for i, cid in enumerate(CELL_IDS)}
+ROOT = Path(__file__).resolve().parent
+
+
+def _union(*parts):
+    return tuple(sorted(set().union(*parts)))
+
+
+# Pattern layouts (cell = 10*row + column). Select with the environment variable TINYCA3_LAYOUT (default "B").
+#   v1: Λ, V, I, O as first read from the figure (they share cells; reports of 2026-11-17 to 2026-11-24).
+#   B : the patterns of docs/figs/CA3_basic_circuit.png (corrected 2026-11-26): four disjoint basic patterns and two
+#       combinations of two basic patterns of the same kind (docs/architecture_update_plan_2026-11-26.md).
+# Roles, the same in every layout: "DA" and "5-HT" are the basic patterns each modulator reaches, "C1" and "C2" the
+# unmodulated basic patterns, "U_mod" the combination that contains both modulated patterns, "U6" the sixth pattern.
+_ring = {10 * r + c for r in range(1, 6) for c in range(1, 6) if r in (1, 5) or c in (1, 5)}
+_V1 = {"Λ": (13, 22, 24, 32, 34, 41, 45, 51, 55), "V": (11, 15, 21, 25, 32, 34, 42, 44, 53),
+       "I": (13, 23, 33, 43, 53), "O": tuple(sorted(_ring))}
+_V1["Λ∪V"] = _union(_V1["Λ"], _V1["V"])
+_V1["Λ∪V∪I"] = _union(_V1["Λ∪V"], _V1["I"])
+_B = {"X": (22, 24, 42, 44), "+": (23, 32, 33, 34, 43),
+      "=": (11, 12, 13, 14, 15, 51, 52, 53, 54, 55), "‖": (21, 25, 31, 35, 41, 45)}
+_B["X∪+"] = _union(_B["X"], _B["+"])
+_B["=∪‖"] = _union(_B["="], _B["‖"])
+LAYOUTS = {
+    "v1": dict(patterns=_V1, order=("Λ", "V", "I", "O", "Λ∪V", "Λ∪V∪I"),
+               roles=dict(DA="Λ", HT="V", C1="I", C2="O", U_mod="Λ∪V", U6="Λ∪V∪I"),
+               combos={"Λ∪V": ("Λ", "V"), "Λ∪V∪I": ("Λ", "V", "I")},
+               probes={"Λ": (22, 24), "V": (42, 44), "I": (23, 33), "O": (12, 14), "Λ→O": (22, 12)}),
+    "B": dict(patterns=_B, order=("X", "+", "=", "‖", "X∪+", "=∪‖"),
+              roles=dict(DA="X", HT="+", C1="=", C2="‖", U_mod="X∪+", U6="=∪‖"),
+              combos={"X∪+": ("X", "+"), "=∪‖": ("=", "‖")},
+              probes={"X": (22, 44), "+": (23, 43), "=": (12, 14), "‖": (31, 35), "X→+": (22, 23),
+                      "=→‖": (13, 31), "X→=": (22, 12)}),
+}
+LAYOUT = os.environ.get("TINYCA3_LAYOUT", "B")
+if LAYOUT not in LAYOUTS:
+    raise ValueError(f"TINYCA3_LAYOUT={LAYOUT!r}, expected one of {sorted(LAYOUTS)}")
+_L = LAYOUTS[LAYOUT]
+PATTERNS = dict(_L["patterns"])
+PATTERN_ORDER = _L["order"]
+ROLE = dict(_L["roles"])
+PA, PB, PC, PD, PAB, P6 = (ROLE[r] for r in ("DA", "HT", "C1", "C2", "U_mod", "U6"))
+BASIC = (PA, PB, PC, PD)
+COMBOS = dict(_L["combos"])
+MOD_PATTERN = {"DA": PA, "5-HT": PB}                      # the basic pattern whose cells each modulator reaches
+MODULATOR_OF = {k: "+".join(m for m, b in MOD_PATTERN.items() if set(PATTERNS[b]) <= set(PATTERNS[k]))
+                for k in PATTERN_ORDER}
+MODULATOR_OF = {k: v for k, v in MODULATOR_OF.items() if v}
+MODULATED = tuple(k for k in PATTERN_ORDER if k in MODULATOR_OF)
+PROBES = dict(_L["probes"])                               # probe synapses (pre, post) recorded every 0.5 ms
+_COLS = ("#c0392b", "#2e6fd8", "#2e9e4f", "#7f7f7f", "#8e44ad", "#a0522d")
+PCOL = dict(zip(PATTERN_ORDER, _COLS))
+RESULTS = ROOT / "results" if LAYOUT == "v1" else ROOT / "results" / f"layout_{LAYOUT}"
+BASIC_DISJOINT = all(not (set(PATTERNS[a]) & set(PATTERNS[b])) for i, a in enumerate(BASIC) for b in BASIC[i + 1:])
+
+
+def synapse_class(pre, post):
+    """Class of the P1 synapse pre -> post (Table 3 of the update plan), for layouts with disjoint basic patterns:
+    'k' inside basic pattern k, 'k1→k2' between two basic patterns presented together in a combination, and
+    'none' for a pair never presented together."""
+    if not BASIC_DISJOINT:
+        raise ValueError(f"layout {LAYOUT}: basic patterns overlap, synapse classes are not defined")
+    ka = next(k for k in BASIC if pre in PATTERNS[k])
+    kb = next(k for k in BASIC if post in PATTERNS[k])
+    if ka == kb:
+        return ka
+    if any(ka in parts and kb in parts for parts in COMBOS.values()):
+        return f"{ka}→{kb}"
+    return "none"
 
 
 @dataclass
@@ -258,3 +317,11 @@ class Circuit:
 def pattern_synapse_mask(circ: Circuit, k):
     cells = set(PATTERNS[k])
     return np.array([(a in cells) and (b in cells) for a, b, _ in circ.p1])
+
+
+def class_synapse_masks(circ: Circuit):
+    """Masks of the P1 synapse classes (keys 'syn:<class>'); empty for layouts whose basic patterns overlap."""
+    if not BASIC_DISJOINT:
+        return {}
+    cls = np.array([synapse_class(a, b) for a, b, _ in circ.p1])
+    return {f"syn:{c}": cls == c for c in dict.fromkeys(cls)}

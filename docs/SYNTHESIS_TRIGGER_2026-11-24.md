@@ -1,5 +1,9 @@
 # Synthesis trigger: DA and 5-HT for minutes (report of 2026-11-24)
 
+> **Pattern layout v1.** This report uses the v1 patterns (Λ, V, I, O), which were misread from the circuit figure and
+> share cells, so the unmodulated controls I and O could capture through Λ and V cells. From 2026-11-26 the default is
+> layout B ([architecture update plan](architecture_update_plan_2026-11-26.md)). Rerun with `TINYCA3_LAYOUT=v1`.
+
 Follow-up to [RESULTS_2026-11-17.md](RESULTS_2026-11-17.md), section 9. The protocol is in
 [PROTOCOL.md](PROTOCOL.md). Figure numbering continues from the earlier reports.
 

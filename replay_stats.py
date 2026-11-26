@@ -10,7 +10,10 @@ chance that this happens for a pattern of n_k cells is hypergeometric:
 Paired control. The same seed run without SWR events (--no-replay) gives the captured weight z without replay; the
 difference replay - control is the effect of replay on capture.
 Writes results/replay_stats.json and results/fig_pilot_7_seeds.png (Figure 7).
+--suffix S reads pilot_s{seed}S.pkl and pilot_s{seed}S_norep.pkl (e.g. --suffix _mod10_gate30) and adds S to the
+output names.
 """
+import argparse
 import json
 import math
 import pickle
@@ -22,13 +25,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy.stats import hypergeom  # noqa: E402
 
-from circuit import PATTERN_ORDER, PATTERNS  # noqa: E402
+from circuit import PATTERN_ORDER, PCOL, RESULTS, PATTERNS  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
+SUFFIX = ""
 SEEDS = (1, 2, 3, 4, 5)
 BURST = 23
 ALPHA = 0.05 / len(PATTERN_ORDER)
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 
 
 def p_chance(k, n_active, n_cells=25, frac=0.8):
@@ -38,7 +41,7 @@ def p_chance(k, n_active, n_cells=25, frac=0.8):
 
 
 def load(seed, norep=False):
-    with open(RES / "seeds" / f"pilot_s{seed}{'_norep' if norep else ''}.pkl", "rb") as f:
+    with open(RES / "seeds" / f"pilot_s{seed}{SUFFIX}{'_norep' if norep else ''}.pkl", "rb") as f:
         return pickle.load(f)
 
 
@@ -59,6 +62,10 @@ def z_by_pattern(d):
 
 
 def main():
+    global SUFFIX
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--suffix", default="")
+    SUFFIX = ap.parse_args().suffix
     stats, z_rep, z_ctl = {}, {}, {}
     for sd in SEEDS:
         d, c = load(sd), load(sd, norep=True)
@@ -79,7 +86,7 @@ def main():
                           dz_mean=float(dz.mean()), dz_sd=float(dz.std(ddof=1)), seeds_dz_negative=int(np.sum(dz < 0)))
     other = dict(bursts=[stats[sd]["n_bursts"] for sd in SEEDS],
                  median_active=[stats[sd]["median_active"] for sd in SEEDS])
-    (RES / "replay_stats.json").write_text(json.dumps(dict(per_seed=stats, summary=summary, other=other,
+    (RES / f"replay_stats{SUFFIX}.json").write_text(json.dumps(dict(per_seed=stats, summary=summary, other=other,
                                                            z_replay=z_rep, z_control=z_ctl), indent=1,
                                                       ensure_ascii=False))
 
@@ -121,7 +128,7 @@ def main():
         ax.text(-0.02, 1.02, f"({chr(97 + i)})", transform=ax.transAxes, fontsize=9, fontweight="bold",
                 ha="right", va="bottom")
     fig.tight_layout()
-    fig.savefig(RES / "fig_pilot_7_seeds.png", dpi=150)
+    fig.savefig(RES / f"fig_pilot_7_seeds{SUFFIX}.png", dpi=150)
     np.set_printoptions(precision=2)
     for k in PATTERN_ORDER:
         s = summary[k]

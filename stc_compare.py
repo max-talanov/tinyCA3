@@ -23,14 +23,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import IDX, PATTERN_ORDER, CircuitParams  # noqa: E402
+from circuit import PROBES, IDX, PA, PATTERN_ORDER, PB, PC, PCOL, PD, RESULTS, CircuitParams  # noqa: E402
 from reference.stc_numpy import advance_slow  # noqa: E402
 from replay_stats import BURST, p_chance  # noqa: E402
 from stc import STCParams  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 SEEDS = (1, 2, 3, 4, 5)
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 STC_COL, STP_COL = "#c0392b", "#555555"
 EPOCHS_H = (0.5, 1.5, 3.0, 6.0)
 ENC_ON_MS = {k: 300.0 + i * 2300.0 for i, k in enumerate(PATTERN_ORDER)}
@@ -119,16 +118,16 @@ def figure_10(stc, nostc, summary):
     # (a) one Λ encoding (3 bursts of 10 spikes at 100 Hz): STP inside each burst, STC between bursts
     ax = axes[0]
     for blk, lab, col, mk in ((enc0, "without STC (STP only)", STP_COL, "s"), (enc, "with STC", STC_COL, "o")):
-        t, stp, stcf = spikes_of(blk, "Λ", U)
+        t, stp, stcf = spikes_of(blk, PA, U)
         m = (t > 250) & (t < 1500)
         ax.plot(t[m], (stp * stcf)[m], "-", color=col, lw=0.6, marker=mk, ms=2.5, label=lab)
-    t, stp, stcf = spikes_of(enc, "Λ", U)
+    t, stp, stcf = spikes_of(enc, PA, U)
     m = (t > 250) & (t < 1500)
     ax.step(t[m], stcf[m], where="post", color=STC_COL, lw=1.2, ls="--", label="STC factor 1 + T̃ + z")
     ax.axhline(1, color="k", lw=0.5, ls=":")
     ax.set_xlabel("time in encoding block (ms)")
     ax.set_ylabel("weight per spike W / w0")
-    ax.set_title("Λ synapse ex_22 → ex_24, first Λ encoding", fontsize=8)
+    ax.set_title(f"{PA} synapse ex_{PROBES[PA][0]} → ex_{PROBES[PA][1]}, first {PA} encoding", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5, loc="upper right")
 
     # (b) whole encoding block: the STC factor steps up at each encoding that contains the synapse
@@ -138,16 +137,16 @@ def figure_10(stc, nostc, summary):
         ax.text((t_on + 550) / 1000, 0.02, k, transform=ax.get_xaxis_transform(), ha="center", fontsize=7,
                 color=PCOL[k])
     for blk, col, mk in ((enc0, STP_COL, "s"), (enc, STC_COL, "o")):
-        t, stp, stcf = spikes_of(blk, "Λ", U)
+        t, stp, stcf = spikes_of(blk, PA, U)
         ax.plot(t / 1000, stp * stcf, ".", color=col, ms=2)
-    for name, ls in (("Λ", "-"), ("I", "-.")):
+    for name, ls in ((PA, "-"), (PC, "-.")):
         b = enc[name]
         ax.plot(enc["t"] / 1000, 1 + b["Tt"] + b["z"], color=PCOL[name], ls=ls, lw=1.2,
                 label=f"STC factor, {name} synapse")
-    ax.plot(enc0["t"] / 1000, 1 + enc0["Λ"]["Tt"] + enc0["Λ"]["z"], color=STP_COL, lw=1.0, ls="--",
+    ax.plot(enc0["t"] / 1000, 1 + enc0[PA]["Tt"] + enc0[PA]["z"], color=STP_COL, lw=1.0, ls="--",
             label="STC factor without STC (= 1)")
     ax.set_xlabel("time in encoding block (s)")
-    ax.set_ylabel("W / w0 (dots: spikes of the Λ synapse)")
+    ax.set_ylabel(f"W / w0 (dots: spikes of the {PA} synapse)")
     ax.set_title("encoding block, 0–14.1 s", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5, loc="upper left")
 
@@ -156,19 +155,19 @@ def figure_10(stc, nostc, summary):
     for d, col, mk, lab in ((nostc, STP_COL, "s", "without STC"), (stc, STC_COL, "o", "with STC")):
         ts, ws = [], []
         for blk in d["probes"]:
-            t, stp, stcf = spikes_of(blk, "Λ", U)
+            t, stp, stcf = spikes_of(blk, PA, U)
             sc = 1.0 if blk["kind"] == "encoding" else REPLAY_SCALE
             ts.append(blk["t0_s"] + t / 1000)
             ws.append(sc * stp * stcf)
         ax.plot(np.concatenate(ts), np.concatenate(ws), mk, color=col, ms=2, alpha=0.6, mew=0,
                 label=f"spikes, {lab}")
-    tt, wt = probe_slow(stc, "Λ")
-    ax.plot(tt[tt > 0.05], wt[tt > 0.05], color=STC_COL, lw=1.4, label="STC factor, Λ synapse")
-    ti, wi = probe_slow(stc, "I")
-    ax.plot(ti[ti > 0.05], wi[ti > 0.05], color=PCOL["I"], lw=1.4, ls="-.", label="STC factor, I synapse")
+    tt, wt = probe_slow(stc, PA)
+    ax.plot(tt[tt > 0.05], wt[tt > 0.05], color=STC_COL, lw=1.4, label=f"STC factor, {PA} synapse")
+    ti, wi = probe_slow(stc, PC)
+    ax.plot(ti[ti > 0.05], wi[ti > 0.05], color=PCOL[PC], lw=1.4, ls="-.", label=f"STC factor, {PC} synapse")
     ins = ax.inset_axes([0.09, 0.36, 0.40, 0.30])
     ins.plot(tt / 3600, wt, color=STC_COL, lw=1.2)
-    ins.plot(ti / 3600, wi, color=PCOL["I"], lw=1.2, ls="-.")
+    ins.plot(ti / 3600, wi, color=PCOL[PC], lw=1.2, ls="-.")
     ins.axhline(1, color=STP_COL, lw=0.8, ls="--")
     ins.set_xlim(0, 8)
     ins.set_ylim(0.95, 1.55)
@@ -176,8 +175,8 @@ def figure_10(stc, nostc, summary):
     ins.tick_params(labelsize=6)
     ins.set_xlabel("h", fontsize=6, labelpad=1)
     ins.set_title("STC factors, linear time", fontsize=6.5, pad=2)
-    ins.text(8, 1.30, "Λ: DA, captured", color=STC_COL, fontsize=6, ha="right", va="bottom")
-    ins.text(8, 1.01, "I: no PRPs, decays", color=PCOL["I"], fontsize=6, ha="right", va="bottom")
+    ins.text(8, 1.30, f"{PA}: DA, captured", color=STC_COL, fontsize=6, ha="right", va="bottom")
+    ins.text(8, 1.01, f"{PC}: no PRPs, decays", color=PCOL[PC], fontsize=6, ha="right", va="bottom")
     ax.axhline(1, color=STP_COL, lw=1.0, ls="--", label="STC factor without STC")
     for e in EPOCHS_H:
         ax.axvspan(e * 3600, e * 3600 + 1800, color="#999", alpha=0.12, lw=0)
@@ -185,13 +184,13 @@ def figure_10(stc, nostc, summary):
     ax.set_xlim(0.2, 8 * 3600)
     ax.set_xticks([1, 10, 60, 600, 3600, 4 * 3600], ["1 s", "10 s", "1 min", "10 min", "1 h", "4 h"])
     ax.set_xlabel("time from start of encoding (log)")
-    ax.set_ylabel("W / w0 (dots: spikes of the Λ synapse)")
+    ax.set_ylabel(f"W / w0 (dots: spikes of the {PA} synapse)")
     ax.set_title("0.2 s to 8 h (grey: replay epochs, P1 × 2.5)", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5, loc="upper left", ncol=2)
 
     # (d) 8 h, pattern means, all five seeds
     ax = axes[3]
-    for k in ("Λ", "V", "I", "O"):
+    for k in (PA, PB, PC, PD):
         ws = []
         for sd in SEEDS:
             t, w = pattern_weight(summary["runs"][sd]["stc"])
@@ -202,7 +201,7 @@ def figure_10(stc, nostc, summary):
         ax.plot(tg, ws.mean(0), color=PCOL[k], lw=1.3, label=f"{k}, with STC")
     for sd in SEEDS:
         t, w = pattern_weight(summary["runs"][sd]["nostc"])
-        ax.plot(t, w["Λ"], color=STP_COL, lw=1.0, ls="--", label="every pattern, without STC" if sd == 1 else None)
+        ax.plot(t, w[PA], color=STP_COL, lw=1.0, ls="--", label="every pattern, without STC" if sd == 1 else None)
     for e in EPOCHS_H:
         ax.axvspan(e, e + 0.5, color="#999", alpha=0.12, lw=0)
     ax.axvspan(0, 1, ymin=0.96, ymax=1, color="#e9a3a3", lw=0)
@@ -221,12 +220,12 @@ def figure_11(summary):
 
     # (a) pattern weight at each of the 80 events
     ax = axes[0]
-    for k in ("Λ", "V", "I", "O"):
+    for k in (PA, PB, PC, PD):
         w = np.array([at_events(runs[sd]["stc"])[1][k] for sd in SEEDS])
         x = np.arange(w.shape[1])
         ax.fill_between(x, w.min(0), w.max(0), color=PCOL[k], alpha=0.2, lw=0)
         ax.plot(x, w.mean(0), color=PCOL[k], lw=1.2, marker=".", ms=2.5, label=k)
-    w0 = np.array([at_events(runs[sd]["nostc"])[1]["Λ"] for sd in SEEDS])
+    w0 = np.array([at_events(runs[sd]["nostc"])[1][PA] for sd in SEEDS])
     ax.plot(np.arange(w0.shape[1]), w0.mean(0), color=STP_COL, ls="--", lw=1, label="all, without STC")
     for i, e in enumerate(EPOCHS_H):
         ax.axvline(20 * i - 0.5, color="k", lw=0.4)
@@ -283,17 +282,17 @@ def main():
     # numbers for the report
     out = dict(U=U, replay_scale=REPLAY_SCALE)
     for lab, d in (("stc", stc1), ("nostc", nostc1)):
-        t, stp, stcf = spikes_of(d["probes"][0], "Λ", U)
+        t, stp, stcf = spikes_of(d["probes"][0], PA, U)
         m = (t > 250) & (t < 1500)
         out[f"seed1_{lab}_first_lambda"] = dict(stp_min=float(stp[m].min()), stp_max=float(stp[m].max()),
                                                 stc_first=float(stcf[m][0]), stc_last=float(stcf[m][-1]),
                                                 W_max=float((stp * stcf)[m].max()), n_spikes=int(m.sum()))
         out[f"seed1_{lab}_encoding_end"] = {n: float(1 + d["probes"][0][n]["Tt"][-1] + d["probes"][0][n]["z"][-1])
                                             for n in d["probe_pairs"]}
-        stp_all = np.concatenate([spikes_of(b, "Λ", U)[1] for b in d["probes"]])
+        stp_all = np.concatenate([spikes_of(b, PA, U)[1] for b in d["probes"]])
         out[f"seed1_{lab}_stp_range_all_spikes"] = [float(stp_all.min()), float(stp_all.max())]
         out[f"seed1_{lab}_n_spikes_Λ_probe"] = int(stp_all.size)
-    tt, wt = probe_slow(stc1, "Λ")
+    tt, wt = probe_slow(stc1, PA)
     out["seed1_stc_probe_Λ_at_h"] = {h: float(np.interp(h * 3600, tt, wt)) for h in (0.5, 1, 2, 4, 8)}
     for c in ("stc", "nostc"):
         pw = {}

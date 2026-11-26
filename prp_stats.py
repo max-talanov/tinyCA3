@@ -20,13 +20,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import PATTERN_ORDER  # noqa: E402
+from circuit import MODULATED, P6, PA, PAB, PB, PC, PCOL, PD, RESULTS, PATTERN_ORDER  # noqa: E402
 from replay_stats import ALPHA, BURST, p_chance  # noqa: E402
 from stc_compare import load, pattern_weight  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 SEEDS = (1, 2, 3, 4, 5)
-PCOL = {"Λ": "#c0392b", "V": "#2e6fd8", "I": "#2e9e4f", "O": "#7f7f7f", "Λ∪V": "#8e44ad", "Λ∪V∪I": "#a0522d"}
 COND = {"control": "", "PRP block": "_prpblock"}
 EPOCHS_H = (0.5, 1.5, 3.0, 6.0)
 TOL = 1.10
@@ -105,7 +104,7 @@ def main():
     fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.2), gridspec_kw=dict(width_ratios=[1.3, 1, 1]))
     ax = axes[0]
     tg = np.linspace(0.004, 8, 500)
-    for k in ("Λ", "V", "I", "O"):
+    for k in (PA, PB, PC, PD):
         for c, ls in (("control", "-"), ("PRP block", "--")):
             ws = np.array([w_at(runs[c][sd], k, tg) for sd in SEEDS])
             ax.plot(tg, ws.mean(0), color=PCOL[k], ls=ls, lw=1.2 if c == "control" else 1.4,
@@ -140,12 +139,12 @@ def main():
 
     ax = axes[2]
     for c, mk, ls in (("control", "o", "-"), ("PRP block", "s", "--")):
-        cap = [sum(out[c]["replays_per_epoch"][k][e] for k in ("Λ", "V", "Λ∪V", "Λ∪V∪I")) for e in range(4)]
-        chn = [sum(out[c]["chance_per_epoch"][k][e] for k in ("Λ", "V", "Λ∪V", "Λ∪V∪I")) for e in range(4)]
+        cap = [sum(out[c]["replays_per_epoch"][k][e] for k in MODULATED) for e in range(4)]
+        chn = [sum(out[c]["chance_per_epoch"][k][e] for k in MODULATED) for e in range(4)]
         ax.plot(range(4), cap, marker=mk, ls=ls, color="#8e44ad", label=f"{c}: observed")
         ax.plot(range(4), chn, marker=mk, ls=ls, color="#bbbbbb", mfc="white", label=f"{c}: chance")
     ax.set_xticks(range(4), [f"{e:g}–{e + 0.5:g} h" for e in EPOCHS_H])
-    ax.set_ylabel("replays of Λ, V, Λ∪V, Λ∪V∪I\n(sum over 5 seeds × 20 events)")
+    ax.set_ylabel(f"replays of {', '.join(MODULATED)}\n(sum over 5 seeds × 20 events)")
     ax.set_title("modulated patterns, per epoch", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5)
     for i, a in enumerate(axes):

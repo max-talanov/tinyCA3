@@ -90,7 +90,7 @@ modulator, PRPs per postsynaptic cell).
 | = internal | 90 | Patterns 3, 6 | None | Back to w_0 with τ_tag |
 | ‖ internal | 30 | Patterns 4, 6 | None | Back to w_0 |
 | = ↔ ‖ cross | 60 + 60 | Pattern 6 only | None | Back to w_0; tagged once |
-| Never co-presented: (X ∪ +) ↔ (= ∪ ‖) | 144 + 144 | No encoding tag (replay only) | Onto X/+ cells only | w_0: the no-tag baseline |
+| Never co-presented: (X ∪ +) ↔ (= ∪ ‖) | 144 + 144 | No co-activity; a weaker tag from postsynaptic firing alone (calcium rule), ~0.1 onto X/+ cells | Onto X/+ cells only | w_0: the no-co-activity baseline |
 
 Total: 12 + 20 + 40 + 90 + 30 + 120 + 288 = 600 ✓.
 

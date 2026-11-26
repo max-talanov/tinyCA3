@@ -19,16 +19,16 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import IDX, PATTERN_ORDER, PATTERNS  # noqa: E402
+from circuit import IDX, PA, PATTERN_ORDER, RESULTS, PATTERNS  # noqa: E402
 from prp_stats import PCOL, SEEDS  # noqa: E402
 from replay_stats import BURST  # noqa: E402
 from stc_compare import load  # noqa: E402
 
-RES = Path(__file__).resolve().parent / "results"
+RES = RESULTS
 MODEL = {"L&T": "", "trigger": "_mod10_gate30"}
 S6 = {"no replay": "_norep", "replay": "", "replay + DA": "_rda10"}
 S7 = {"no DA": "_noencda", "replay DA": "_noencda_rda10", "encoding DA": ""}
-LAM = [IDX[c] for c in PATTERNS["Λ"]]
+LAM = [IDX[c] for c in PATTERNS[PA]]
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
 
 
@@ -50,7 +50,7 @@ def main():
         R[m] = (r6, r7)
         da6 = {sd: [round(e["t_s"] / 3600, 2) for e in r6["replay + DA"][sd]["events"] if e.get("da")] for sd in SEEDS}
         da7 = {sd: [round(e["t_s"] / 3600, 2) for e in r7["replay DA"][sd]["events"] if e.get("da")] for sd in SEEDS}
-        lam7 = {c: [sum(1 for e in r7[c][sd]["events"] if "Λ" in e["replayed"] and e["n_active"] < BURST)
+        lam7 = {c: [sum(1 for e in r7[c][sd]["events"] if PA in e["replayed"] and e["n_active"] < BURST)
                     for sd in SEEDS] for c in S7}
         s6, s7 = {}, {}
         for k in PATTERN_ORDER:
@@ -65,7 +65,7 @@ def main():
         out[m] = dict(
             section6=dict(summary=s6, da_events_h=da6, n_da=[len(da6[sd]) for sd in SEEDS]),
             section7=dict(summary=s7, da_events_h=da7, lam_replays=lam7,
-                          z_lam_per_seed={c: [round(v, 4) for v in z7[c]["Λ"]] for c in S7},
+                          z_lam_per_seed={c: [round(v, 4) for v in z7[c][PA]] for c in S7},
                           P_lam_peak={c: [round(float(np.asarray(r7[c][sd]["slow_P"])[:, LAM].mean(1).max()), 3)
                                           for sd in SEEDS] for c in ("no DA", "replay DA")}))
     (RES / "rda_trigger_stats.json").write_text(json.dumps(out, indent=1, ensure_ascii=False))
@@ -75,9 +75,9 @@ def main():
         for k in PATTERN_ORDER:
             print("  s6", k, out[m]["section6"]["summary"][k])
         print(" s7 DA events", out[m]["section7"]["da_events_h"])
-        print(" s7 Λ replays", out[m]["section7"]["lam_replays"])
-        print(" s7 z Λ per seed", out[m]["section7"]["z_lam_per_seed"])
-        print(" s7 P peak Λ", out[m]["section7"]["P_lam_peak"])
+        print(f" s7 {PA} replays", out[m]["section7"]["lam_replays"])
+        print(f" s7 z {PA} per seed", out[m]["section7"]["z_lam_per_seed"])
+        print(f" s7 P peak {PA}", out[m]["section7"]["P_lam_peak"])
         for k in PATTERN_ORDER:
             print("  s7", k, out[m]["section7"]["summary"][k])
 
@@ -106,22 +106,22 @@ def main():
                    edgecolor="k", lw=0.4)
             ax.plot(xi + np.linspace(-0.25, 0.25, len(v)), v, "k.", ms=3)
     ax.set_xticks(range(6), [f"{c}\n{m}" for m in MODEL for c in S7], fontsize=6.5)
-    ax.set_ylabel("z of Λ at 8 h")
-    ax.set_title("section 7 (X4): Λ with DA only from replay", fontsize=8)
+    ax.set_ylabel(f"z of {PA} at 8 h")
+    ax.set_title(f"section 7 (X4): {PA} with DA only from replay", fontsize=8)
 
     ax = axes[1, 0]
     r7 = R["trigger"][1]
     for c, col in (("no DA", "#999999"), ("replay DA", "#c0392b")):
         for sd in SEEDS:
             d = r7[c][sd]
-            ax.plot(np.asarray(d["slow_t"]) / 3600, [v["Λ"] for v in d["slow_z"]], color=col, lw=0.8,
+            ax.plot(np.asarray(d["slow_t"]) / 3600, [v[PA] for v in d["slow_z"]], color=col, lw=0.8,
                     label=c if sd == 1 else None)
     for sd in SEEDS:
         for t in out["trigger"]["section7"]["da_events_h"][sd]:
             ax.axvline(t, color="#c0392b", lw=0.4, alpha=0.4)
     ax.set_xlabel("time after encoding (h)")
-    ax.set_ylabel("mean z of Λ")
-    ax.set_title("X4 with trigger: capture of Λ (lines: replay DA events)", fontsize=8)
+    ax.set_ylabel(f"mean z of {PA}")
+    ax.set_title(f"X4 with trigger: capture of {PA} (lines: replay DA events)", fontsize=8)
     ax.legend(frameon=False, fontsize=6.5)
 
     ax = axes[1, 1]
@@ -132,7 +132,7 @@ def main():
         ln, = ax.plot(t, np.asarray(d["slow_P"])[:, LAM].mean(1), lw=0.9, label=f"seed {sd} ({n} DA)")
         ax.plot(t, np.asarray(d["slow_G"])[:, LAM].mean(1), lw=0.6, ls=":", color=ln.get_color())
     ax.set_xlabel("time after encoding (h)")
-    ax.set_ylabel("Λ cells, mean")
+    ax.set_ylabel(f"{PA} cells, mean")
     ax.set_title("X4 with trigger: PRP pool P (solid) and trigger G (dotted)", fontsize=8)
     ax.legend(frameon=False, fontsize=6)
     for i, a in enumerate(axes.flat):
