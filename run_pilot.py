@@ -80,7 +80,7 @@ def main():
                     help="PRP synthesis blocked (alpha_P = 0): tags are set but never captured")
     ap.add_argument("--ht-girk", type=float, default=0.0,
                     help="5-HT1A -> Kir3 (GIRK) conductance (S/cm2) on the pyramidal cells 5-HT reaches, on while 5-HT "
-                         "is present; 1.5e-4 hyperpolarizes a cell by ~6 mV (cells.py, Johnston et al. 2014). 0 = off")
+                         "is present; 6e-5 gives the measured 4.3 mV hyperpolarization (neuron/ch_GIRK.mod, Johnston et al. 2014). 0 = off")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
