@@ -1,0 +1,22 @@
+{
+ "vhalf_mV": 0.0,
+ "vslope_mV": 27.75,
+ "rectification_index_fit": -0.41,
+ "rectification_index_measured_median": -0.62,
+ "held_Vm_mV": -45.2,
+ "gmax_used": 6e-05,
+ "dV_used_mV": 4.39,
+ "dV_measured_mV": [
+  4.3,
+  1.6
+ ],
+ "dV_by_gmax": {
+  "0": 0.0,
+  "1e-05": 0.83,
+  "2e-05": 1.59,
+  "4e-05": 3.02,
+  "6e-05": 4.39,
+  "8e-05": 5.77,
+  "0.0001": 7.15
+ }
+}
