@@ -3,9 +3,9 @@
 Layout B has disjoint basic patterns, so every recurrent synapse falls into exactly one class:
   modulated   X, + (inside a basic pattern), X→+, +→X (tagged only in X∪+)
   controls    =, ‖ (inside),                   =→‖, ‖→= (tagged only in =∪‖)
-  none        pairs never presented together: no co-activity (postsynaptic firing alone still sets a weaker tag)
-Each modulated class has an unmodulated twin with the same tagging history (X/+ ~ =/‖, X→+/+→X ~ =→‖/‖→=), so the
-difference between twins is the effect of PRP availability alone.
+  none        pairs never presented together: no co-activity (presynaptic firing alone still sets a weaker tag)
+Each modulated class has an unmodulated twin with the same sequence of presentations (X/+ ~ =/‖, X→+/+→X ~ =→‖/‖→=).
+The twins differ in tag amplitude, so the effect of PRPs alone is a class against itself under --prp-block.
 
 Reads results/layout_B/seeds/pilot_s{seed}{suffix}.pkl (run_pilot.py with TINYCA3_LAYOUT=B). For every condition
 found, reports W = mean 1 + Tt + z per class at 0.5, 1, 2, 4 and 8 h (mean and range over seeds), and draws
@@ -20,7 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import BASIC_DISJOINT, LAYOUT, PA, PB, PC, PCOL, PD, RESULTS  # noqa: E402
+from circuit import BASIC_DISJOINT, LAYOUT, PA, PB, PC, PD, RESULTS  # noqa: E402
 
 SEEDS = (1, 2, 3, 4, 5)
 COND = {"10 min + trigger": "_mod10_gate30", "PRP block": "_mod10_gate30_prpblock",
@@ -29,8 +29,12 @@ T_H = (0.5, 1.0, 2.0, 4.0, 8.0)
 MOD_CLASSES = (PA, PB, f"{PA}→{PB}", f"{PB}→{PA}")
 CTRL_CLASSES = (PC, PD, f"{PC}→{PD}", f"{PD}→{PC}", "none")
 TWIN = {PA: PC, PB: PD, f"{PA}→{PB}": f"{PC}→{PD}", f"{PB}→{PA}": f"{PD}→{PC}"}
-CCOL = {PA: PCOL[PA], PB: PCOL[PB], f"{PA}→{PB}": "#e67e22", f"{PB}→{PA}": "#16a085",
-        PC: PCOL[PC], PD: PCOL[PD], f"{PC}→{PD}": "#7d6608", f"{PD}→{PC}": "#5d6d7e", "none": "#000000"}
+# One colour per twin pair: solid = modulated class, dashed = its unmodulated twin, dotted = never co-presented.
+PAIR_COL = ("#c0392b", "#2e6fd8", "#e67e22", "#16a085")
+CCOL = {**{k: c for k, c in zip(TWIN, PAIR_COL)}, **{v: c for v, c in zip(TWIN.values(), PAIR_COL)}, "none": "#000000"}
+CLABEL = {PA: f"{PA} (DA)", PB: f"{PB} (5-HT)", f"{PA}→{PB}": f"{PA}→{PB} (5-HT)", f"{PB}→{PA}": f"{PB}→{PA} (DA)",
+          PC: f"{PC}, twin of {PA}", PD: f"{PD}, twin of {PB}", f"{PC}→{PD}": f"{PC}→{PD}, twin of {PA}→{PB}",
+          f"{PD}→{PC}": f"{PD}→{PC}, twin of {PB}→{PA}", "none": "never co-presented"}
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
 
 
@@ -83,28 +87,29 @@ def main():
         json.dump(out, f, indent=1, ensure_ascii=False)
 
     conds = list(runs)
-    fig, axes = plt.subplots(len(conds), 2, figsize=(9, 3.0 * len(conds)), squeeze=False, sharey=True)
+    fig, axes = plt.subplots(len(conds), 1, figsize=(7.5, 3.4 * len(conds)), squeeze=False, sharex=True, sharey=True)
     for row, c in enumerate(conds):
         per_seed = [class_weight(d) for d in runs[c]]
-        tg = np.linspace(per_seed[0][0][0], 8.0, 400)
-        for col, (title, classes) in enumerate((("modulated (DA → X, 5-HT → +)", MOD_CLASSES),
-                                                ("unmodulated controls; none = never co-presented", CTRL_CLASSES))):
-            ax = axes[row, col]
-            for k in classes:
-                ws = np.array([np.interp(tg, t, w[k]) for t, w in per_seed])
-                ls = "--" if "→" in k else (":" if k == "none" else "-")
-                ax.plot(tg, ws.mean(0), color=CCOL[k], lw=1.4, ls=ls, label=k)
-                if len(ws) > 1:
-                    ax.fill_between(tg, ws.min(0), ws.max(0), color=CCOL[k], alpha=0.12, lw=0)
-            ax.axhline(1.0, color="0.6", lw=0.6)
-            ax.set_xscale("log")
-            ax.set_xlim(tg[0], 8.0)
-            ax.set_title(f"{c}: {title}", fontsize=8)
-            ax.set_xlabel("time (h)")
-            if col == 0:
-                ax.set_ylabel(f"mean 1 + T̃ + z per class\n(mean of {len(per_seed)} seeds, band: range)")
-            ax.legend(fontsize=6.5, frameon=False, loc="upper right")
-    fig.tight_layout()
+        tg = np.geomspace(per_seed[0][0][0], 8.0, 600)
+        ax = axes[row, 0]
+        for k in MOD_CLASSES + CTRL_CLASSES:
+            ws = np.array([np.interp(tg, t, w[k]) for t, w in per_seed])
+            ls = ":" if k == "none" else ("-" if k in MOD_CLASSES else "--")
+            ax.plot(tg, ws.mean(0), color=CCOL[k], lw=1.6 if k in MOD_CLASSES else 1.2, ls=ls, label=CLABEL[k])
+            if len(ws) > 1:
+                ax.fill_between(tg, ws.min(0), ws.max(0), color=CCOL[k], alpha=0.10, lw=0)
+        ax.axhline(1.0, color="0.6", lw=0.6)
+        ax.set_xscale("log")
+        ax.set_xlim(tg[0], 8.0)
+        ax.set_title(f"{c}: solid = modulated, dashed = unmodulated twin ({len(per_seed)} seeds, band: range)",
+                     fontsize=8)
+        ax.set_ylabel("mean 1 + T̃ + z per synapse class")
+    axes[-1, 0].set_xlabel("time from the start of encoding (h, log scale)")
+    h_, l_ = axes[0, 0].get_legend_handles_labels()
+    order = [0, 4, 1, 5, 2, 6, 3, 7, 8]                  # each modulated class next to its twin
+    fig.legend([h_[i] for i in order], [l_[i] for i in order], fontsize=7, frameon=False, ncol=5,
+               loc="lower center", bbox_to_anchor=(0.5, 0.0))
+    fig.tight_layout(rect=(0, 0.07 / len(conds) * 1.5, 1, 1))
     fig.savefig(RESULTS / "fig_B1_classes.png", dpi=160)
     print("saved", RESULTS / "class_stats.json", RESULTS / "fig_B1_classes.png")
 

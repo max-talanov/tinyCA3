@@ -131,7 +131,7 @@ DG selects six patterns on the 5 × 5 grid (Table 3, Figure 3), read cell by cel
 
 **No overlaps.** The basic patterns share no cell. Two patterns share cells only when one is a combination that contains the other. In particular, no cell of = or ‖ ever receives DA or 5-HT, and no synapse receives both modulators.
 
-**Synapse classes.** Because the basic patterns are disjoint, each of the 600 recurrent synapses falls into one class (Table 3a). Each modulated class has an unmodulated twin with the same tagging history, so the difference between twins is the effect of PRP availability alone.
+**Synapse classes.** Because the basic patterns are disjoint, each of the 600 recurrent synapses falls into one class (Table 3a). Each modulated class has an unmodulated twin with the same sequence of presentations. The twins do not get the same tag amplitude, though (the combination =∪‖ has 16 cells and fires more slowly than X∪+), so the clean measure of capture is each class with PRPs against the same class under a PRP block ([results of 2026-11-26](LAYOUT_B_RESULTS_2026-11-26.md)).
 
 **Table 3a.** Classes of the P1 synapses (`circuit.synapse_class`).
 
@@ -139,11 +139,11 @@ DG selects six patterns on the 5 × 5 grid (Table 3, Figure 3), read cell by cel
 | --- | --- | --- | --- |
 | X | 12 | Patterns 1 and 5 | = |
 | + | 20 | Patterns 2 and 5 | ‖ |
-| X→+, +→X | 20 + 20 | Pattern 5 only | =→‖, ‖→= |
+| X→+, +→X | 20 + 20 | Pattern 5 (co-activity); patterns 1 and 2 (presynaptic firing alone) | =→‖, ‖→= |
 | = | 90 | Patterns 3 and 6 | X |
 | ‖ | 30 | Patterns 4 and 6 | + |
-| =→‖, ‖→= | 60 + 60 | Pattern 6 only | X→+, +→X |
-| none: (X ∪ +) ↔ (= ∪ ‖) | 144 + 144 | No co-activity; a weaker tag from postsynaptic firing alone (calcium rule) | — |
+| =→‖, ‖→= | 60 + 60 | Pattern 6 (co-activity); patterns 3 and 4 (presynaptic firing alone) | X→+, +→X |
+| none: (X ∪ +) ↔ (= ∪ ‖) | 144 + 144 | No co-activity; presynaptic firing alone (calcium rule, c_pre = 1) | — |
 
 **Mapping of the modulators.** DA modulates the X pattern (panel EC1) and 5-HT the + pattern (panel EC2), as drawn in the figure. Pattern 5 contains both and receives both modulators; a synapse in it gets the modulator of its postsynaptic cell.
 
