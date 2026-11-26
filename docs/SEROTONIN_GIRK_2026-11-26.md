@@ -13,7 +13,7 @@ Commits: d2d59ed (mechanism), f639f35 (calibration).
 | 2 | How is it calibrated? | Rectification is fitted to the measured I-V (vhalf 0 mV, vslope 27.7 mV relative to E_K). gmax = 6 × 10⁻⁵ S/cm² gives 4.4 mV of hyperpolarization near −45 mV, against the measured 4.3 ± 1.6 mV |
 | 3 | When is it on? | In the + cells while 5-HT is present: from the encoding of + (2.6 s) for 10 min. It is off in every replay epoch, the first of which starts at 0.5 h |
 | 4 | Does it change encoding? | **No.** The + cells fire at 90 Hz with and without it, and the tags of every synapse class at the end of encoding agree to 0.001. The 100 Hz mossy-fibre drive overrides a 4–6 mV hyperpolarization |
-| 5 | What about the 8-h weights? | The 15 runs (5 seeds × control, PRP block, no replay) are still going. Given item 4, they are expected to match the layout-B results; section 5 will be filled in when they finish |
+| 5 | What about the 8-h weights? | **Unchanged.** In 15 runs (5 seeds × control, PRP block, no replay), every synapse class ends within 0.002 of the runs without the current. The + class is 1.544 against 1.546; the controls agree to 0.0001. 394 of 400 replay events recruit the same cells |
 | 6 | Is the PRP gate of 5-HT changed? | No. Its only STC source is in CA2, where 5-HT makes weak LTD last through BDNF/TrkB (Benoy et al. 2022). That fits a gate on synthesis, but it acts on LTD tags, and this protocol sets only positive tags |
 
 ## 1. The mechanism
@@ -99,7 +99,34 @@ without the current in [the layout-B report](LAYOUT_B_RESULTS_2026-11-26.md).
 
 ## 5. Results at 8 h
 
-Pending: the runs started on 2026-11-26 and take about 3 hours.
+Mean W = 1 + T̃ + z per class at 8 h, 5 seeds, without and with the current (`class_stats.json` and
+`class_stats_girk.json`):
+
+| Class | Control, off | Control, on | PRP block, off | PRP block, on | No replay, off | No replay, on |
+| --- | --- | --- | --- | --- | --- | --- |
+| X (DA) | 1.542 | 1.541 | 1.004 | 1.004 | 1.592 | 1.591 |
+| + (5-HT, GIRK) | 1.546 | 1.544 | 1.007 | 1.007 | 1.595 | 1.596 |
+| X→+ | 1.530 | 1.529 | 1.005 | 1.005 | 1.564 | 1.565 |
+| +→X | 1.529 | 1.528 | 1.007 | 1.007 | 1.564 | 1.565 |
+| = | 1.006 | 1.006 | 1.006 | 1.006 | 1.006 | 1.006 |
+| ‖ | 1.006 | 1.006 | 1.006 | 1.006 | 1.007 | 1.007 |
+| =→‖ | 1.005 | 1.005 | 1.005 | 1.005 | 1.005 | 1.005 |
+| ‖→= | 1.005 | 1.005 | 1.005 | 1.005 | 1.005 | 1.005 |
+| never co-presented | 1.001 | 1.001 | 1.002 | 1.002 | 1.004 | 1.004 |
+
+![Figure B1 with the GIRK current: mean weight per synapse class over 8 h, control, PRP block and no replay.](../results/layout_B/fig_B1_classes_girk.png)
+
+**Figure G2.** Figure B1 of the layout-B report, rerun with the current (`class_stats.py --girk`). It is
+indistinguishable from the original.
+
+- **Paired by seed, the + class moves by at most 0.012** (seed 2, control: z −0.012). The other seeds move by
+  0.003 or less, and the sign varies. Under the PRP block every z stays 0.
+- **Replay is unchanged.** Over the 5 control seeds, 394 of 400 events recruit exactly the same cells, and the
+  replay counts per pattern are equal except for + (68 → 66). The few changed events come from the slightly different
+  tags, not from the current, which is off during replay.
+- **Where the small differences come from.** At the end of encoding the tags differ by at most 0.0006. The capture
+  runs for over an hour and replay feeds back on the weights, so these grow to the 0.001–0.002 differences seen at
+  8 h. They are of the size of seed-to-seed noise and have no consistent sign.
 
 ## 6. What this means, and next steps
 
