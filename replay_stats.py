@@ -6,7 +6,7 @@ chance that this happens for a pattern of n_k cells is hypergeometric:
 (the same as shuffling the pattern over random cells of equal size). Per seed and pattern:
     observed  = events read out as replay of k (bursts with >= 23 active cells excluded)
     expected  = sum of p_chance over the same events (chance level)
-    significant = replays with p_chance < 0.05 / 6 (Bonferroni over the six patterns)
+    significant = replays with p_chance < 0.05 / n (Bonferroni over the n patterns: 6 in layout B, 7 in B7)
 Paired control. The same seed run without SWR events (--no-replay) gives the captured weight z without replay; the
 difference replay - control is the effect of replay on capture.
 Writes results/replay_stats.json and results/fig_pilot_7_seeds.png (Figure 7).

@@ -31,8 +31,12 @@ def _union(*parts):
 #   v1: Λ, V, I, O as first read from the figure (they share cells; reports of 2026-11-17 to 2026-11-24).
 #   B : the patterns of docs/figs/CA3_basic_circuit.png (corrected 2026-11-26): four disjoint basic patterns and two
 #       combinations of two basic patterns of the same kind (docs/architecture_update_plan_2026-11-26.md).
+#   B7: B plus a seventh pattern, the mixed combination X∪‖ of a modulated and an unmodulated basic pattern. It tests
+#       neighbour capture: the ‖→X synapses end on X cells, which have PRPs, while every synapse onto a ‖ or = cell
+#       still has none (PRPs are per postsynaptic cell), so the controls stay free of capture.
 # Roles, the same in every layout: "DA" and "5-HT" are the basic patterns each modulator reaches, "C1" and "C2" the
-# unmodulated basic patterns, "U_mod" the combination that contains both modulated patterns, "U6" the sixth pattern.
+# unmodulated basic patterns, "U_mod" the combination that contains both modulated patterns, "U6" the sixth pattern,
+# "U_mix" (B7 only) the mixed combination.
 _ring = {10 * r + c for r in range(1, 6) for c in range(1, 6) if r in (1, 5) or c in (1, 5)}
 _V1 = {"Λ": (13, 22, 24, 32, 34, 41, 45, 51, 55), "V": (11, 15, 21, 25, 32, 34, 42, 44, 53),
        "I": (13, 23, 33, 43, 53), "O": tuple(sorted(_ring))}
@@ -42,6 +46,7 @@ _B = {"X": (22, 24, 42, 44), "+": (23, 32, 33, 34, 43),
       "=": (11, 12, 13, 14, 15, 51, 52, 53, 54, 55), "‖": (21, 25, 31, 35, 41, 45)}
 _B["X∪+"] = _union(_B["X"], _B["+"])
 _B["=∪‖"] = _union(_B["="], _B["‖"])
+_B7 = dict(_B, **{"X∪‖": _union(_B["X"], _B["‖"])})
 LAYOUTS = {
     "v1": dict(patterns=_V1, order=("Λ", "V", "I", "O", "Λ∪V", "Λ∪V∪I"),
                roles=dict(DA="Λ", HT="V", C1="I", C2="O", U_mod="Λ∪V", U6="Λ∪V∪I"),
@@ -52,6 +57,11 @@ LAYOUTS = {
               combos={"X∪+": ("X", "+"), "=∪‖": ("=", "‖")},
               probes={"X": (22, 44), "+": (23, 43), "=": (12, 14), "‖": (31, 35), "X→+": (22, 23),
                       "=→‖": (13, 31), "X→=": (22, 12)}),
+    "B7": dict(patterns=_B7, order=("X", "+", "=", "‖", "X∪+", "=∪‖", "X∪‖"),
+               roles=dict(DA="X", HT="+", C1="=", C2="‖", U_mod="X∪+", U6="=∪‖", U_mix="X∪‖"),
+               combos={"X∪+": ("X", "+"), "=∪‖": ("=", "‖"), "X∪‖": ("X", "‖")},
+               probes={"X": (22, 44), "+": (23, 43), "=": (12, 14), "‖": (31, 35), "X→+": (22, 23),
+                       "=→‖": (13, 31), "X→=": (22, 12), "‖→X": (21, 22), "X→‖": (22, 21)}),
 }
 LAYOUT = os.environ.get("TINYCA3_LAYOUT", "B")
 if LAYOUT not in LAYOUTS:
@@ -61,6 +71,7 @@ PATTERNS = dict(_L["patterns"])
 PATTERN_ORDER = _L["order"]
 ROLE = dict(_L["roles"])
 PA, PB, PC, PD, PAB, P6 = (ROLE[r] for r in ("DA", "HT", "C1", "C2", "U_mod", "U6"))
+PMIX = ROLE.get("U_mix")                                  # the mixed combination (layout B7), else None
 BASIC = (PA, PB, PC, PD)
 COMBOS = dict(_L["combos"])
 MOD_PATTERN = {"DA": PA, "5-HT": PB}                      # the basic pattern whose cells each modulator reaches
@@ -69,9 +80,9 @@ MODULATOR_OF = {k: "+".join(m for m, b in MOD_PATTERN.items() if set(PATTERNS[b]
 MODULATOR_OF = {k: v for k, v in MODULATOR_OF.items() if v}
 MODULATED = tuple(k for k in PATTERN_ORDER if k in MODULATOR_OF)
 PROBES = dict(_L["probes"])                               # probe synapses (pre, post) recorded every 0.5 ms
-_COLS = ("#c0392b", "#2e6fd8", "#2e9e4f", "#7f7f7f", "#8e44ad", "#a0522d")
+_COLS = ("#c0392b", "#2e6fd8", "#2e9e4f", "#7f7f7f", "#8e44ad", "#a0522d", "#d4a017")
 PCOL = dict(zip(PATTERN_ORDER, _COLS))
-RESULTS = ROOT / "results" if LAYOUT == "v1" else ROOT / "results" / f"layout_{LAYOUT}"
+RESULTS = ROOT / "results" if LAYOUT == "v1" else ROOT / "results" / f"layout_{LAYOUT}"   # B7: results/layout_B7
 BASIC_DISJOINT = all(not (set(PATTERNS[a]) & set(PATTERNS[b])) for i, a in enumerate(BASIC) for b in BASIC[i + 1:])
 
 

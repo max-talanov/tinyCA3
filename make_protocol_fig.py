@@ -1,6 +1,6 @@
 """Figure P1 of docs/PROTOCOL.md: the pilot protocol at five time scales.
 
-(a) the whole 8-h run; (b) the first 90 min (modulator windows, PRP build-up); (c) the 14.1-s encoding block;
+(a) the whole 8-h run; (b) the first 90 min (modulator windows, PRP build-up); (c) the encoding block (14.1 s in layout B, 16.4 s in B7);
 (d) one replay epoch; (e) one replay event. Timings are read from run_pilot.py and circuit.py, so the figure
 follows the code. Writes results/fig_protocol.png.
 """
@@ -41,7 +41,8 @@ def main():
     rows = {"encoding": 3, f"DA → {PA} cells": 2, f"5-HT → {PB} cells": 1.4, "replay epochs": 0.6, "offline STC": -0.2}
     lane(ax, rows["offline STC"], 0, 8, C_OFF)
     ax.plot([t_enc_s / 3600] * 2, [2.7, 3.3], color=C_ENC, lw=3)
-    ax.text(0.05, 3, "14.1 s, six patterns (c)", va="center", fontsize=7)
+    ax.text(0.05, 3, f"{(ENC_START_MS + len(PATTERN_ORDER) * ENC_STEP_MS) / 1000:.1f} s, "
+                     f"{len(PATTERN_ORDER)} patterns (c)", va="center", fontsize=7)
     for d, ls, a in ((MOD_MIN, "-", 1), (60, ":", 0.35)):
         lane(ax, rows[f"DA → {PA} cells"], on[PA] / 3600, on[PA] / 3600 + d / 60, C_DA, alpha=a, h=0.4)
         lane(ax, rows[f"5-HT → {PB} cells"], on[PB] / 3600, on[PB] / 3600 + d / 60, C_HT, alpha=a, h=0.4)
@@ -148,7 +149,7 @@ def main():
            "pattern k replayed  ⇔  ≥ 80% of its cells active\n"
            "burst (not replay)  ⇔  ≥ 23 of 25 PYR active\n"
            "chance: hypergeometric draw of the same number of cells\n"
-           "per-event significance: p_chance < 0.05 / 6\n\n"
+           f"per-event significance: p_chance < 0.05 / {len(PATTERN_ORDER)}\n\n"
            "weights: W_k = mean 1 + T̃ + z of the P1 synapses inside k")
     ax.text(0, 0.95, txt, va="top", fontsize=7, linespacing=1.6, family="DejaVu Sans")
 

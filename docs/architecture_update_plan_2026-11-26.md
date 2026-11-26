@@ -99,6 +99,36 @@ two basic patterns, each presented on its own and again in a combination, plus c
 combination. So every modulated class has a matched unmodulated class. The difference between them is the effect of
 PRP availability (capture) on a tag of the same history.
 
+### 2.1a Layout B7: the mixed seventh pattern (added 2026-11-26)
+
+`TINYCA3_LAYOUT=B7` is layout B plus pattern 7, X∪‖ (cells 21, 22, 24, 25, 31, 35, 41, 42, 44, 45; 10 cells, DA on the
+X cells only). It answers open choice 1 (section 4): can an unmodulated input be captured on a modulated neighbour?
+Patterns 1 to 6 and their timing are unchanged. Pattern 7 is presented last, at 14.1 s, inside the DA window, and the
+encoding block grows from 14.1 to 16.4 s. Layout B stays the default, so the B results reproduce.
+
+**Table 3, additions for B7.** Classes that change (all others as in Table 3).
+
+| Class | Count | Tagged by | PRPs | Expected at 8 h |
+| --- | --- | --- | --- | --- |
+| X internal | 12 | Patterns 1, 5, 7 | DA | Captured; tagged 3 times instead of 2 |
+| ‖ internal | 30 | Patterns 4, 6, 7 | None | Back to w_0; tagged 3 times instead of 2 |
+| ‖ → X cell | 24 | Pattern 7 only | DA (postsynaptic X cell) | Captured if its tag passes 0.2: neighbour capture |
+| X → ‖ cell | 24 | Pattern 7 only | None | Back to w_0; the same tag history as ‖ → X, without PRPs |
+| Never co-presented: + ↔ (= ∪ ‖), X ↔ = | 160 + 80 | Presynaptic firing alone | Onto X/+ cells only | w_0 |
+
+Total: 12 + 20 + 40 + 90 + 30 + 120 + 48 + 240 = 600 ✓.
+
+Two consequences:
+
+- B7 breaks the symmetry of section 2.1. X and ‖ are now presented three times each, + and = twice, so the twin
+  pairs X/= and +/‖ no longer share a presentation count. Compare each class against itself under the PRP block.
+- The controls stay free of capture. PRPs are per postsynaptic cell, and no = or ‖ cell receives a modulator, so
+  =, ‖, =↔‖ and X→‖ all keep z = 0. The new capture route is ‖→X, and the matched readout is ‖→X against X→‖.
+
+Implementation: `circuit.LAYOUTS["B7"]` (role `U_mix`, export `PMIX`, probes ‖→X (21, 22) and X→‖ (22, 21)).
+`class_stats.py` adds the two mixed classes when `PMIX` is set. The tests in `tests/test_patterns.py` check the class
+counts. The 5-seed runs (control, PRP block, no replay; about 1 h each) are not run yet.
+
 ### 2.2 Points to check
 
 1. **Small modulated patterns.** X has 4 cells (12 synapses) and + has 5 (20). Check that:
@@ -172,5 +202,5 @@ Keep the old patterns selectable (`LAYOUT = "v1" | "B"`, default "B"), so that t
 ## 4. Open choices
 
 1. Whether the "pattern 6 neighbour-capture" question of v1 (can an unmodulated input capture from modulated
-   neighbours?) is still wanted. Layout B does not test it, because no combination mixes the two kinds. A mixed
-   combination such as X∪‖ could be added later as a seventh pattern.
+   neighbours?) is still wanted. Layout B does not test it, because no combination mixes the two kinds. Layout B7
+   (section 2.1a) adds the mixed combination X∪‖ as a seventh pattern.

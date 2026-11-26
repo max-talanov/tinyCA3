@@ -1,10 +1,10 @@
-"""Pilot: encoding of the six patterns, DA/5-HT, then 8 h of slow STC dynamics with four replay epochs.
+"""Pilot: encoding of the patterns (6, or 7 in layout B7), DA/5-HT, then 8 h of slow STC dynamics with four replay epochs.
 
 Single seed, hand-calibrated weights (circuit.CircuitParams). A pilot: its numbers are not accepted results.
 Saves results/pilot.npz (+ results/pilot_events.pkl) for make_figures.py.
 
 Timeline (real time, no compression):
-  0 s       online encoding block: the six patterns in turn (layout B: X, +, =, ‖, X∪+, =∪‖; v1: Λ, V, I, O,
+  0 s       online encoding block: the patterns in turn (layout B: X, +, =, ‖, X∪+, =∪‖; B7: B, then X∪‖; v1: Λ, V, I, O,
             Λ∪V, Λ∪V∪I), each 3 x 100 ms at 100 Hz into EC_k, 0.4 s apart,
             next pattern 1 s later (L&T 2021 learning protocol); DA (X cells) and 5-HT (+ cells) on for 60 min
             from the encoding of X and +

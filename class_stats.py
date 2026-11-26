@@ -6,11 +6,15 @@ Layout B has disjoint basic patterns, so every recurrent synapse falls into exac
   none        pairs never presented together: no co-activity (presynaptic firing alone still sets a weaker tag)
 Each modulated class has an unmodulated twin with the same sequence of presentations (X/+ ~ =/‖, X→+/+→X ~ =→‖/‖→=).
 The twins differ in tag amplitude, so the effect of PRPs alone is a class against itself under --prp-block.
+Layout B7 adds the mixed combination X∪‖ and two mixed classes:
+  ‖→X   unmodulated presynaptic cell onto an X cell, which has PRPs: neighbour capture is possible
+  X→‖   X cell onto a ‖ cell, which has no PRPs: tag only, no capture
+In B7 the twins also differ in presentation count: X and ‖ are presented 3 times, + and = twice.
 
 Reads results/layout_B/seeds/pilot_s{seed}{suffix}.pkl (run_pilot.py with TINYCA3_LAYOUT=B). For every condition
 found, reports W = mean 1 + Tt + z per class at 0.5, 1, 2, 4 and 8 h (mean and range over seeds), and draws
 Figure B1. Writes results/layout_B/class_stats.json and results/layout_B/fig_B1_classes.png.
-Usage: TINYCA3_LAYOUT=B .venv/bin/python class_stats.py
+Usage: TINYCA3_LAYOUT=B .venv/bin/python class_stats.py   (or TINYCA3_LAYOUT=B7: results/layout_B7)
 """
 import json
 import pickle
@@ -20,7 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from circuit import BASIC_DISJOINT, LAYOUT, PA, PB, PC, PD, RESULTS  # noqa: E402
+from circuit import BASIC_DISJOINT, LAYOUT, PA, PB, PC, PD, PMIX, RESULTS  # noqa: E402
 
 SEEDS = (1, 2, 3, 4, 5)
 COND = {"10 min + trigger": "_mod10_gate30", "PRP block": "_mod10_gate30_prpblock",
@@ -28,13 +32,21 @@ COND = {"10 min + trigger": "_mod10_gate30", "PRP block": "_mod10_gate30_prpbloc
 T_H = (0.5, 1.0, 2.0, 4.0, 8.0)
 MOD_CLASSES = (PA, PB, f"{PA}→{PB}", f"{PB}→{PA}")
 CTRL_CLASSES = (PC, PD, f"{PC}→{PD}", f"{PD}→{PC}", "none")
+# Mixed classes (layout B7 only): the mixed combination PMIX = PA ∪ PD.
+MIX_CLASSES = (f"{PD}→{PA}", f"{PA}→{PD}") if PMIX else ()
+ALL_CLASSES = MOD_CLASSES + CTRL_CLASSES + MIX_CLASSES
 TWIN = {PA: PC, PB: PD, f"{PA}→{PB}": f"{PC}→{PD}", f"{PB}→{PA}": f"{PD}→{PC}"}
 # One colour per twin pair: solid = modulated class, dashed = its unmodulated twin, dotted = never co-presented.
 PAIR_COL = ("#c0392b", "#2e6fd8", "#e67e22", "#16a085")
-CCOL = {**{k: c for k, c in zip(TWIN, PAIR_COL)}, **{v: c for v, c in zip(TWIN.values(), PAIR_COL)}, "none": "#000000"}
+CCOL = {**{k: c for k, c in zip(TWIN, PAIR_COL)}, **{v: c for v, c in zip(TWIN.values(), PAIR_COL)}, "none": "#000000",
+        f"{PD}→{PA}": "#8e44ad", f"{PA}→{PD}": "#8e44ad"}
+# Line style: solid = modulated, dashed = twin, dotted = never co-presented; mixed: dash-dot onto X, loose dots onto ‖.
+CLS = {**{k: "-" for k in MOD_CLASSES}, **{k: "--" for k in CTRL_CLASSES}, "none": ":",
+       f"{PD}→{PA}": "-.", f"{PA}→{PD}": (0, (1, 3))}
 CLABEL = {PA: f"{PA} (DA)", PB: f"{PB} (5-HT)", f"{PA}→{PB}": f"{PA}→{PB} (5-HT)", f"{PB}→{PA}": f"{PB}→{PA} (DA)",
           PC: f"{PC}, twin of {PA}", PD: f"{PD}, twin of {PB}", f"{PC}→{PD}": f"{PC}→{PD}, twin of {PA}→{PB}",
-          f"{PD}→{PC}": f"{PD}→{PC}, twin of {PB}→{PA}", "none": "never co-presented"}
+          f"{PD}→{PC}": f"{PD}→{PC}, twin of {PB}→{PA}", "none": "never co-presented",
+          f"{PD}→{PA}": f"{PD}→{PA} (mixed, onto DA cells)", f"{PA}→{PD}": f"{PA}→{PD} (mixed, onto unmodulated cells)"}
 plt.rcParams.update({"font.size": 8, "axes.spines.top": False, "axes.spines.right": False})
 
 
@@ -70,7 +82,7 @@ def main():
     for c, rs in runs.items():
         per_seed = [class_weight(d) for d in rs]
         res = {}
-        for k in MOD_CLASSES + CTRL_CLASSES:
+        for k in ALL_CLASSES:
             at = np.array([np.interp(T_H, t, w[k]) for t, w in per_seed])
             fin = np.array([final_weight(d)[k] for d in rs])
             res[k] = dict(mean_at_h={h: round(float(v), 4) for h, v in zip(T_H, at.mean(0))},
@@ -79,7 +91,7 @@ def main():
         res["twin_difference_8h"] = {k: round(res[k]["mean_8h"] - res[v]["mean_8h"], 4) for k, v in TWIN.items()}
         out[c] = dict(seeds=[d["seed"] for d in rs], classes=res)
         print(f"\n{c}: seeds {out[c]['seeds']}")
-        for k in MOD_CLASSES + CTRL_CLASSES:
+        for k in ALL_CLASSES:
             r = res[k]
             print(f"  {k:6s} W(1h)={r['mean_at_h'][1.0]:.3f}  W(8h)={r['mean_8h']:.3f} [{r['min_8h']:.3f}, {r['max_8h']:.3f}]")
         print("  modulated - twin control at 8 h:", res["twin_difference_8h"])
@@ -92,24 +104,26 @@ def main():
         per_seed = [class_weight(d) for d in runs[c]]
         tg = np.geomspace(per_seed[0][0][0], 8.0, 600)
         ax = axes[row, 0]
-        for k in MOD_CLASSES + CTRL_CLASSES:
+        for k in ALL_CLASSES:
             ws = np.array([np.interp(tg, t, w[k]) for t, w in per_seed])
-            ls = ":" if k == "none" else ("-" if k in MOD_CLASSES else "--")
-            ax.plot(tg, ws.mean(0), color=CCOL[k], lw=1.6 if k in MOD_CLASSES else 1.2, ls=ls, label=CLABEL[k])
+            ax.plot(tg, ws.mean(0), color=CCOL[k], lw=1.6 if k in MOD_CLASSES + MIX_CLASSES else 1.2, ls=CLS[k],
+                    label=CLABEL[k])
             if len(ws) > 1:
                 ax.fill_between(tg, ws.min(0), ws.max(0), color=CCOL[k], alpha=0.10, lw=0)
         ax.axhline(1.0, color="0.6", lw=0.6)
         ax.set_xscale("log")
         ax.set_xlim(tg[0], 8.0)
-        ax.set_title(f"{c}: solid = modulated, dashed = unmodulated twin ({len(per_seed)} seeds, band: range)",
+        ax.set_title(f"{c}: solid = modulated, dashed = unmodulated twin"
+                     f"{', purple = mixed' if PMIX else ''} ({len(per_seed)} seeds, band: range)",
                      fontsize=8)
         ax.set_ylabel("mean 1 + T̃ + z per synapse class")
     axes[-1, 0].set_xlabel("time from the start of encoding (h, log scale)")
     h_, l_ = axes[0, 0].get_legend_handles_labels()
-    order = [0, 4, 1, 5, 2, 6, 3, 7, 8]                  # each modulated class next to its twin
+    pos = {k: i for i, k in enumerate(ALL_CLASSES)}     # each modulated class next to its twin, then the rest
+    order = [pos[x] for k, v in TWIN.items() for x in (k, v)] + [pos[k] for k in ("none",) + MIX_CLASSES]
     fig.legend([h_[i] for i in order], [l_[i] for i in order], fontsize=7, frameon=False, ncol=5,
                loc="lower center", bbox_to_anchor=(0.5, 0.0))
-    fig.tight_layout(rect=(0, 0.07 / len(conds) * 1.5, 1, 1))
+    fig.tight_layout(rect=(0, (0.07 if not PMIX else 0.10) / len(conds) * 1.5, 1, 1))
     fig.savefig(RESULTS / "fig_B1_classes.png", dpi=160)
     print("saved", RESULTS / "class_stats.json", RESULTS / "fig_B1_classes.png")
 

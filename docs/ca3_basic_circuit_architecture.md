@@ -149,6 +149,37 @@ DG selects six patterns on the 5 × 5 grid (Table 3, Figure 3), read cell by cel
 
 **Earlier layout (v1).** Until 2026-11-26 the patterns were read as Λ, V, a vertical bar I and the border O. That reading did not match the figure, and its patterns shared cells: Λ and V shared 32 and 34, and 40% of the I synapses and 62% of the O synapses ended on a Λ or V cell, so the unmodulated controls could capture. The reports of 2026-11-17 to 2026-11-24 use v1, which stays selectable with `TINYCA3_LAYOUT=v1`.
 
+**Layout B7: a seventh, mixed pattern.** `TINYCA3_LAYOUT=B7` keeps the six patterns of layout B and adds pattern 7, X∪‖ (Figure 3b). It joins a modulated basic pattern (X) and an unmodulated one (‖), so it is the one combination that mixes the two kinds. It is presented last, at 14.1 s, while DA is still on, so the encoding block lasts 16.4 s instead of 14.1 s. It receives DA on its X cells only. B7 tests neighbour capture: can an input from an unmodulated cell be captured on a modulated cell? Layout B remains the default, and B7 writes to `results/layout_B7`.
+
+```text
+ 7  X∪‖  +DA (X cells)
+ . . . . .
+ # # . # #
+ # . . . #
+ # # . # #
+ . . . . .
+```
+
+**Figure 3b.** Pattern 7 of layout B7: 10 cells, 90 synapses inside it.
+
+Pattern 7 changes Table 3a in three ways (Table 3b):
+
+- 48 synapses move out of the class none into two mixed classes.
+- X and ‖ are now presented three times each, while + and = are still presented twice. In B7 the twins therefore differ in presentation count as well as in tag amplitude.
+- The controls stay free of capture, because PRPs are made per postsynaptic cell: every synapse onto a = or ‖ cell, including X→‖, still has no PRPs.
+
+**Table 3b.** Classes of the P1 synapses that differ in layout B7.
+
+| Class | Count | Tagged at encoding by | PRPs (postsynaptic cell) | Expected at 8 h |
+| --- | --- | --- | --- | --- |
+| X | 12 | Patterns 1, 5 and 7 | DA | Captured |
+| ‖ | 30 | Patterns 4, 6 and 7 | None | Back to w_0 |
+| ‖→X | 24 | Pattern 7 (co-activity); pattern 4 (presynaptic firing alone) | DA | Captured if the single co-activity tag passes the capture threshold: neighbour capture |
+| X→‖ | 24 | Pattern 7 (co-activity); pattern 1 (presynaptic firing alone) | None | Back to w_0: a tag without capture, with the same history as ‖→X |
+| none: + ↔ (= ∪ ‖), X ↔ = | 160 + 80 | No co-activity; presynaptic firing alone | Onto X/+ cells only | w_0 |
+
+The pair ‖→X against X→‖ is the cleanest readout B7 adds. Both classes are tagged in the same presentation, and only the postsynaptic cell, and with it the presence of PRPs, differs.
+
 ## Plasticity
 
 ### What each level does in the circuit
@@ -198,7 +229,7 @@ Read this way, the patterns form a small experiment with matched controls (Table
 | 5 | X∪+ | Yes | DA and 5-HT | Captured, including the cross synapses X ↔ + | Capture of synapses tagged once, between two modulated patterns |
 | 6 | =∪‖ | Yes | None | Decays to w_0, including the cross synapses = ↔ ‖ | The control for pattern 5 |
 
-Under per-cell PRPs the outcome of every synapse is set by its postsynaptic cell. If PRPs were shared beyond the cell (the Frey–Morris design, point 7 of the plasticity model), the controls would still not capture, since no control cell is near a modulated one in the model; a test of shared PRPs needs a mixed combination (for example X∪‖), which layout B leaves out on purpose.
+Under per-cell PRPs the outcome of every synapse is set by its postsynaptic cell. If PRPs were shared beyond the cell (the Frey–Morris design, point 7 of the plasticity model), the controls would still not capture, since no control cell is near a modulated one in the model; a test of shared PRPs needs a mixed combination. Layout B leaves it out on purpose; layout B7 adds it as pattern 7, X∪‖ (Table 3b).
 
 ### Replay and selection
 

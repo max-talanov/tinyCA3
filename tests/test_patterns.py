@@ -13,10 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-@pytest.fixture(scope="module")
-def cB():
+def _layout(name):
     old = os.environ.get("TINYCA3_LAYOUT")
-    os.environ["TINYCA3_LAYOUT"] = "B"
+    os.environ["TINYCA3_LAYOUT"] = name
     import circuit
     mod = importlib.reload(circuit)
     yield mod
@@ -25,6 +24,18 @@ def cB():
     else:
         os.environ["TINYCA3_LAYOUT"] = old
     importlib.reload(circuit)
+    import stc
+    importlib.reload(stc)
+
+
+@pytest.fixture
+def cB():
+    yield from _layout("B")
+
+
+@pytest.fixture
+def cB7():
+    yield from _layout("B7")
 
 
 def test_patterns_match_figure(cB):
@@ -75,3 +86,48 @@ def test_probes_cover_classes(cB):
     for name, (a, b) in cB.PROBES.items():
         assert a != b and a in cB.CELL_IDS and b in cB.CELL_IDS
     assert {cB.synapse_class(*ab) for ab in cB.PROBES.values()} == {"X", "+", "=", "‖", "X→+", "=→‖", "none"}
+
+
+# Layout B7: B plus the mixed combination X∪‖ (a modulated and an unmodulated basic pattern).
+
+def test_b7_order_and_mixed_pattern(cB7):
+    P = cB7.PATTERNS
+    assert cB7.PATTERN_ORDER == ("X", "+", "=", "‖", "X∪+", "=∪‖", "X∪‖")
+    assert set(P["X∪‖"]) == set(P["X"]) | set(P["‖"])
+    assert cB7.PMIX == "X∪‖"
+    assert cB7.BASIC_DISJOINT
+    assert len(cB7.PCOL) == 7 and cB7.RESULTS.name == "layout_B7"
+    for k in ("X", "+", "=", "‖", "X∪+", "=∪‖"):
+        assert set(P[k]) == set(cB7.LAYOUTS["B"]["patterns"][k])
+
+
+def test_b7_mixed_combination_kinds(cB7):
+    mixed = [k for k, parts in cB7.COMBOS.items()
+             if len({p in cB7.MOD_PATTERN.values() for p in parts}) == 2]
+    assert mixed == ["X∪‖"]
+
+
+def test_b7_controls_never_get_a_modulator(cB7):
+    import stc
+    stc = importlib.reload(stc)
+    mod_cells = set().union(*stc.MOD_CELLS.values())
+    assert stc.MOD_CELLS == {"DA": set(cB7.PATTERNS["X"]), "5-HT": set(cB7.PATTERNS["+"])}
+    for k in ("=", "‖", "=∪‖"):
+        assert not set(cB7.PATTERNS[k]) & mod_cells
+        assert k not in cB7.MODULATOR_OF
+    assert cB7.MODULATOR_OF == {"X": "DA", "+": "5-HT", "X∪+": "DA+5-HT", "X∪‖": "DA"}
+
+
+def test_b7_synapse_class_counts(cB7):
+    cls = Counter(cB7.synapse_class(a, b) for a, b in permutations(cB7.CELL_IDS, 2))
+    assert cls == {"X": 12, "+": 20, "X→+": 20, "+→X": 20, "=": 90, "‖": 30, "=→‖": 60, "‖→=": 60,
+                   "X→‖": 24, "‖→X": 24, "none": 240}
+    assert sum(cls.values()) == 600
+
+
+def test_b7_probes_cover_classes(cB7):
+    for name, (a, b) in cB7.PROBES.items():
+        assert a != b and a in cB7.CELL_IDS and b in cB7.CELL_IDS
+        assert cB7.synapse_class(a, b) == name or name == "X→="
+    assert {cB7.synapse_class(*ab) for ab in cB7.PROBES.values()} == \
+        {"X", "+", "=", "‖", "X→+", "=→‖", "X→‖", "‖→X", "none"}

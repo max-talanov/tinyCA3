@@ -60,7 +60,7 @@ flowchart LR
 | Pattern replayed | ≥ 80% of the cells of pattern k active | `run_pilot.py` |
 | Burst | ≥ 23 of 25 PYR active. Bursts are excluded from replay counts | `replay_stats.py` |
 | Chance | Hypergeometric probability that a random set of the same size covers ≥ 80% of k | `replay_stats.py` |
-| Per-event significance | p_chance < 0.05 / 6 | `replay_stats.py` |
+| Per-event significance | p_chance < 0.05 / n, n = number of patterns (6; 7 in layout B7) | `replay_stats.py` |
 | Pattern weight | W_k = mean 1 + T̃ + z of the P1 synapses inside k, at fixed times and at 8 h | `stc_compare.py`, `prp_stats.py` |
 | Class weight (layout B) | Mean 1 + T̃ + z per synapse class (architecture doc, Table 3a); each modulated class against its unmodulated twin | `class_stats.py` |
 

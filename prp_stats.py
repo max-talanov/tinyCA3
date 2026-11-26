@@ -8,7 +8,7 @@ Pass criteria (algorithm doc section 4, check 1):
   (1) every pattern weight W_k = mean 1 + Tt + z inside pattern k is within 10% of w0 at 8 h (W_k <= 1.10), in every
       seed;
   (2) replay of every pattern stops: in the late epochs (3-3.5 h, 6-6.5 h) no pattern is read out as replayed above
-      chance (summed over seeds), and no single event passes the per-event test p_chance < 0.05/6.
+      chance (summed over seeds), and no single event passes the per-event test p_chance < 0.05/n (n patterns).
 Chance uses the hypergeometric null of replay_stats.py. Writes results/prp_stats.json and
 results/fig_pilot_12_prp_block.png (Figure 12, numbering continues the report of 2026-11-17).
 """
