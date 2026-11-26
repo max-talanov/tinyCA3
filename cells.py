@@ -85,6 +85,10 @@ def build_pyr(p: PyrParams = PyrParams(), name="pyr"):
             seg.ch_HCNp.e = b["e_hcn"]
     for seg in dend:
         seg.ch_Navp.ar2 = 0.8
+    for sec in (soma, dend):                       # 5-HT1A -> Kir3 (GIRK); off until 5-HT switches it on (run_pilot)
+        sec.insert("ch_GIRK")
+        for seg in sec:
+            seg.ch_GIRK.gmax = 0.0
     for mech in ("ch_Navaxonp", "ch_Kdrp", "ch_KvAproxp"):
         axon.insert(mech)
     for seg in axon:

@@ -35,7 +35,7 @@ import numpy as np
 
 from circuit import (CELL_IDS, LAYOUT, MOD_PATTERN, PATTERN_ORDER, PATTERNS, PROBES, RESULTS, Circuit, CircuitParams,
                      class_synapse_masks, pattern_synapse_mask)
-from stc import ModPulse, STCParams, advance, modulator_at
+from stc import MOD_CELLS, ModPulse, STCParams, advance, modulator_at
 
 OUT = RESULTS
 T_END_S = 8 * 3600.0
@@ -78,6 +78,9 @@ def main():
                          "this time constant (min); 0 = off, theta_pro follows the modulator (L&T 2021)")
     ap.add_argument("--prp-block", action="store_true",
                     help="PRP synthesis blocked (alpha_P = 0): tags are set but never captured")
+    ap.add_argument("--ht-girk", type=float, default=0.0,
+                    help="5-HT1A -> Kir3 (GIRK) conductance (S/cm2) on the pyramidal cells 5-HT reaches, on while 5-HT "
+                         "is present; 1.5e-4 hyperpolarizes a cell by ~6 mV (cells.py, Johnston et al. 2014). 0 = off")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
@@ -109,6 +112,12 @@ def main():
                                      {name: {var: np.array(v) for var, v in rec.items()}
                                       for name, rec in probe_rec.items()}))
     Tt, z, P = np.zeros(n), np.zeros(n), np.zeros(len(CELL_IDS))
+    ht_segs = [seg for cid in MOD_CELLS["5-HT"] for key in ("soma", "dend") for seg in circ.pyr[cid][key]]
+
+    def set_girk(g):
+        """5-HT1A -> Kir3 on the 5-HT cells (pyramidal only: Johnston et al. 2014 found none in PV basket cells)."""
+        for seg in ht_segs:
+            seg.ch_GIRK.gmax = g
 
     # --- encoding (one online block) ---------------------------------------------------------------------------
     enc_on = {k: ENC_START_MS + i * ENC_STEP_MS for i, k in enumerate(PATTERN_ORDER)}
@@ -120,7 +129,16 @@ def main():
         vec.record(s._ref_Tt, 5.0)
     t0 = time.time()
     circ.set_state(replay=False)                        # encoding state
+    girk_play = []
+    if args.ht_girk > 0:                                # step on at the 5-HT onset (encoding of its pattern)
+        t_ht = enc_on[MOD_PATTERN["5-HT"]]
+        for seg in ht_segs:
+            tv, gv = h.Vector([0.0, t_ht]), h.Vector([0.0, args.ht_girk])
+            gv.play(seg._ref_gmax_ch_GIRK, tv, 0)
+            girk_play.append((tv, gv))
     enc = circ.run_block(t_enc_ms, Tt, z, P, block=0)
+    for _, gv in girk_play:
+        gv.play_remove()
     circ.clear_schedules()
     print(f"encoding block {t_enc_ms / 1000:.1f} s simulated in {time.time() - t0:.0f} s", flush=True)
     grab_probes(0.0, "encoding")
@@ -161,6 +179,7 @@ def main():
         if args.no_replay:
             continue
         circ.set_state(replay=True)                     # replay state
+        set_girk(args.ht_girk if modulator_at(pulses, t_s)[1]["5-HT"] > 0 else 0.0)
         circ.schedule_swr(SWR_AT_MS, event=block)
         r = circ.run_block(EVENT_MS, Tt, z, P, block=block)
         grab_probes(t_s, "replay")
@@ -197,6 +216,8 @@ def main():
             suffix = f"_gate{args.gate:g}" + suffix
         if args.mod_min != 60.0:
             suffix = f"_mod{args.mod_min:g}" + suffix
+        if args.ht_girk > 0:
+            suffix += "_girk"
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(layout=LAYOUT, seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
@@ -204,7 +225,7 @@ def main():
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]),
                              slow_G=np.array(slow["G"]), gate=args.gate, events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
-                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min,
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min, ht_girk=args.ht_girk,
                              probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
         print("saved", name)
         return

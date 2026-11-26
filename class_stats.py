@@ -14,8 +14,11 @@ In B7 the twins also differ in presentation count: X and ‖ are presented 3 tim
 Reads results/layout_B/seeds/pilot_s{seed}{suffix}.pkl (run_pilot.py with TINYCA3_LAYOUT=B). For every condition
 found, reports W = mean 1 + Tt + z per class at 0.5, 1, 2, 4 and 8 h (mean and range over seeds), and draws
 Figure B1. Writes results/layout_B/class_stats.json and results/layout_B/fig_B1_classes.png.
+With --girk it reads the runs with the 5-HT1A -> Kir3 current (run_pilot.py --ht-girk, suffix _girk) and writes
+class_stats_girk.json and fig_B1_classes_girk.png.
 Usage: TINYCA3_LAYOUT=B .venv/bin/python class_stats.py   (or TINYCA3_LAYOUT=B7: results/layout_B7)
 """
+import argparse
 import json
 import pickle
 
@@ -72,9 +75,13 @@ def final_weight(d):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--girk", action="store_true", help="runs with the 5-HT GIRK current (suffix _girk)")
+    args = ap.parse_args()
+    tag = "_girk" if args.girk else ""
     if not BASIC_DISJOINT:
         raise SystemExit(f"layout {LAYOUT}: synapse classes need disjoint basic patterns (use TINYCA3_LAYOUT=B)")
-    runs = {c: [d for d in (load(sd, suf) for sd in SEEDS) if d is not None] for c, suf in COND.items()}
+    runs = {c: [d for d in (load(sd, suf) for sd in SEEDS) if d is not None] for c, suf in ((c, suf + tag) for c, suf in COND.items())}
     runs = {c: r for c, r in runs.items() if r}
     if not runs:
         raise SystemExit(f"no runs found in {RESULTS / 'seeds'}")
@@ -95,7 +102,7 @@ def main():
             r = res[k]
             print(f"  {k:6s} W(1h)={r['mean_at_h'][1.0]:.3f}  W(8h)={r['mean_8h']:.3f} [{r['min_8h']:.3f}, {r['max_8h']:.3f}]")
         print("  modulated - twin control at 8 h:", res["twin_difference_8h"])
-    with open(RESULTS / "class_stats.json", "w") as f:
+    with open(RESULTS / f"class_stats{tag}.json", "w") as f:
         json.dump(out, f, indent=1, ensure_ascii=False)
 
     conds = list(runs)
@@ -124,8 +131,8 @@ def main():
     fig.legend([h_[i] for i in order], [l_[i] for i in order], fontsize=7, frameon=False, ncol=5,
                loc="lower center", bbox_to_anchor=(0.5, 0.0))
     fig.tight_layout(rect=(0, (0.07 if not PMIX else 0.10) / len(conds) * 1.5, 1, 1))
-    fig.savefig(RESULTS / "fig_B1_classes.png", dpi=160)
-    print("saved", RESULTS / "class_stats.json", RESULTS / "fig_B1_classes.png")
+    fig.savefig(RESULTS / f"fig_B1_classes{tag}.png", dpi=160)
+    print("saved", RESULTS / f"class_stats{tag}.json", RESULTS / f"fig_B1_classes{tag}.png")
 
 
 if __name__ == "__main__":
