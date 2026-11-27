@@ -105,10 +105,45 @@ The larger finding is the sign change of the + tags with a weaker drive. Near s 
 tags strong enough to be captured, and 5-HT gates their capture. That gives the LTD protocol for + from the earlier
 reports without a new plasticity rule.
 
-- [ ] Rerun at s = 0.15 (LTD tags of −0.26, captured under 5-HT) with GIRK off and on and with the PRP block: does
-  5-HT make the + LTD last, as in CA2 (Benoy et al. 2022)?
+- [x] Rerun at s = 0.15 (LTD tags of −0.26, captured under 5-HT) with GIRK off and on and with the PRP block: does
+  5-HT make the + LTD last, as in CA2 (Benoy et al. 2022)? Yes, partly: section 5.
 - [ ] Separate the dendritic and somatic GIRK (insert only in the soma) to test whether NMDA calcium explains the X→+
   change.
 - [ ] Slow GIRK onset (about 5 min, Johnston et al. 2014 Fig. 1A): at s = 0.05 the current is on during all of
   encoding; with a 5-min onset the current should miss encoding, and the effect should disappear.
 - [ ] Spiking background between events, where the slice effect (5 → 1.9 Hz) was measured.
+
+## 5. LTD test at s = 0.15
+
+30 runs: 5 seeds × {control, PRP block, no replay} × {GIRK off, on}, `--mf-5ht 0.15`, otherwise as above
+(`class_stats.py --mf-5ht 0.15 [--girk]`, `ltd_fig.py`, `ltd_test.json`).
+
+| Class (who gates capture) | Tag at end of encoding | W at 8 h, control | W at 8 h, PRP block | W at 8 h, no replay | Captured z at 8 h |
+| --- | --- | --- | --- | --- | --- |
+| + (5-HT) | −0.256 | 0.950 (0.949–0.953) | 0.996 | 0.950 | −0.047 |
+| +→X (DA) | −0.287 | 0.905 (0.900–0.914) | 0.995 | 0.909 | −0.093 |
+| X→+ (5-HT) | 0.490 | 1.476 | 1.005 | 1.490 | 0.465 |
+| X (DA) | 0.639 | 1.535 | 1.005 | 1.558 | 0.518 |
+| =, ‖ (no modulator) | | 1.006 | 1.006 | 1.006 | 0 |
+
+![Two panels: (a) W over 8 h for +, +→X and X→+ at scale 0.15, with PRPs (solid) and under the PRP block (dashed); + and +→X stay below 1 only with PRPs. (b) tags of + and +→X rising through the −0.2 threshold at 0.5 and 0.7 h, with the captured z flattening at the same times.](../results/layout_B/fig_ltd_test.png)
+
+**Figure W2.** `ltd_fig.py`. (a) mean over 5 seeds, GIRK off. (b) control, the first 2.5 h.
+
+- **5-HT makes the LTD of + last, but only a fraction of it.** With PRPs the + weights end at 0.950 in every seed;
+  under the PRP block they return to 0.996. The lasting depression is −0.047, a tenth of the LTP captured by X→+ in the
+  same cells (+0.465).
+- **The limit is the tag, not the PRPs.** The + cells make as many PRPs as with the calibrated drive (peak P 0.60
+  against 0.65, synthesis until 7.3 h), because synthesis counts |T̃| and the X→+ tags onto the same cells are large.
+  But the LTD tag starts at −0.26 and stays past the −0.2 threshold for only 0.49 h, so capture stops early. The
+  calibrated LTP tags of + stay past 0.2 for 1.6 h.
+- **DA captures more of the same LTD.** +→X starts deeper (−0.29), stays past the threshold until 0.69 h, and ends with
+  twice the captured z (−0.093). The modulator is not the difference: the time above threshold is.
+- **Replay does not matter for the LTD.** No-replay runs end at the same + weight (0.950). The replay of + drops to
+  36 events over 5 seeds (68 with the calibrated drive).
+- **GIRK does not matter at this drive.** Every class with GIRK on is within 0.002 of GIRK off, as the encoding sweep
+  predicted (tags equal within 0.003).
+
+So in this model 5-HT can consolidate LTD with the same rule it uses for LTP, as in CA2 (Benoy et al. 2022), but a
+weak LTD tag is captured only briefly. A deeper or longer-lived LTD tag (a lower capture threshold for LTD, or a
+slower decay of negative tags) would be needed for a larger lasting depression. Neither has a source yet.

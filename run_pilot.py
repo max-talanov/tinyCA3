@@ -83,6 +83,10 @@ def main():
                          "is present; 6e-5 gives the measured 4.3 mV hyperpolarization (neuron/ch_GIRK.mod, Johnston et al. 2014). 0 = off")
     ap.add_argument("--mf-5ht", type=float, default=1.0,
                     help="mossy-fibre weight onto the 5-HT cells x this (weaker encoding of +; 1 = calibrated drive)")
+    ap.add_argument("--trace", action="store_true",
+                    help="with --light: also keep the spikes and voltages (1 ms, float32) of encoding and of every event, "
+                         "the 5-ms tag trace of encoding, and 1 + Tt + z of every synapse before and after each event "
+                         "(suffix _trace; extended report of 2026-11-27)")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
@@ -158,7 +162,7 @@ def main():
     G = None
 
     def log(t, Tt_, z_, P_, G_=None):
-        if not slow["t"] or t - slow["t"][-1] >= 59.9:
+        if not slow["t"] or t - slow["t"][-1] >= (9.9 if args.trace else 59.9):   # --trace: every 10 s
             _, src = modulator_at(pulses, t)
             slow["t"].append(t)
             slow["Tt"].append({k: float(Tt_[m].mean()) for k, m in masks.items()})
@@ -183,6 +187,7 @@ def main():
         circ.set_state(replay=True)                     # replay state
         set_girk(args.ht_girk if modulator_at(pulses, t_s)[1]["5-HT"] > 0 else 0.0)
         circ.schedule_swr(SWR_AT_MS, event=block)
+        w_before = (1.0 + Tt + z).astype(np.float32)
         r = circ.run_block(EVENT_MS, Tt, z, P, block=block)
         grab_probes(t_s, "replay")
         circ.clear_schedules()
@@ -195,6 +200,10 @@ def main():
         ev = dict(t_s=t_s, frac=frac, replayed=replayed, n_active=len(active), active=sorted(active))
         if not args.light:
             ev.update(spikes={k: v for k, v in r["spikes"].items()}, v=r["v"], t=r["t"])
+        elif args.trace:
+            ev.update(spikes={k: v.astype(np.float32) for k, v in r["spikes"].items()},
+                      v={k: v[::2].astype(np.float32) for k, v in r["v"].items()}, t=r["t"][::2].astype(np.float32),
+                      W_before=w_before, W_after=(1.0 + Tt + z).astype(np.float32))
         events.append(ev)
         if args.replay_da > 0 and MOD_PATTERN["DA"] in replayed and len(active) < 23:
             pulses.append(ModPulse("DA", t_s, 60.0 * args.replay_da, args.replay_da_amp))
@@ -222,6 +231,8 @@ def main():
             suffix += f"_mf{args.mf_5ht:g}"
         if args.ht_girk > 0:
             suffix += "_girk"
+        if args.trace:
+            suffix += "_trace"
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
         with open(name, "wb") as f:
             pickle.dump(dict(layout=LAYOUT, seed=args.seed, no_replay=args.no_replay, replay_da=args.replay_da,
@@ -230,7 +241,11 @@ def main():
                              slow_G=np.array(slow["G"]), gate=args.gate, events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
                              p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min, ht_girk=args.ht_girk, mf_5ht=args.mf_5ht,
-                             probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
+                             probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U),
+                             enc=(dict(t=enc["t"][::2].astype(np.float32), enc_on=enc_on, t_enc_ms=t_enc_ms,
+                                       spikes={k: v.astype(np.float32) for k, v in enc["spikes"].items()},
+                                       v={k: v[::2].astype(np.float32) for k, v in enc["v"].items()},
+                                       Tt_trace=enc["Tt_trace"].astype(np.float32)) if args.trace else None)), f)
         print("saved", name)
         return
     np.savez_compressed(OUT / "pilot.npz", slow_t=np.array(slow["t"]), slow_P=np.array(slow["P"]),
