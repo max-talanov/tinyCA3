@@ -134,7 +134,9 @@ With this protocol, 5-HT1A–GIRK is silent where it is switched on. During enco
 During replay 5-HT is already off. That fits the low firing of raphe 5-HT neurons in slow-wave sleep, when sharp waves
 occur, though that is not yet sourced here. A 5-HT effect would show where the paper found it: in weak, spontaneous activity. Options:
 
-- [ ] Weaker encoding of + (fewer or slower mossy-fibre pulses), so that 5-HT1A can lower firing and the tags.
+- [x] Weaker encoding of + (fewer or slower mossy-fibre pulses), so that 5-HT1A can lower firing and the tags. Done
+  with a weaker mossy-fibre weight ([report of 2026-11-27](SEROTONIN_WEAK_DRIVE_2026-11-27.md)): an effect only near
+  threshold (s = 0.05), X→+ −0.044 and X −0.013 at 8 h.
 - [ ] Spiking background between events, so that a long 5-HT release can lower the background calcium and tags.
 - [ ] An LTD protocol for the + pattern, to test the CA2 result (5-HT makes weak LTD last; Benoy et al. 2022).
 - [ ] The slow onset (about 5 min) and the fall in EPSC frequency, if a weaker-drive protocol makes them matter.

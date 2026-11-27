@@ -111,6 +111,7 @@ class CircuitParams:
     gaba_tau2: float = 8.0        # ms, placeholder
     w_ed: float = 0.006           # P4
     w_mf: float = 0.35            # P5, AMPA only: keeps members near 90 Hz in the large patterns despite inhibition
+    mf_scale_5ht: float = 1.0     # P5 weight onto the 5-HT cells (pattern MOD_PATTERN['5-HT']) x this; < 1 = weaker encoding
     mf_nmda: bool = False         # P5 NMDA component (True gives seconds of reverberation after encoding)
     p1_gmax_nmda: float = 0.3     # P1 NMDA/AMPA conductance ratio, a quarter of the CA1 value 1.23 (limits reverberation)
     w_ce_total: float = 0.00268   # P6, divided over the cells of the pattern: EC fires at ~90% (threshold 0.00236)
@@ -198,7 +199,8 @@ class Circuit:
         for k, cells in PATTERNS.items():
             self._nc(self.ec[k]["soma"], self._syn(self.dg[k]["soma"], 0.5, nmda=False), p.w_ed, p.d_ed)
             for cid in cells:
-                self._nc(self.dg[k]["soma"], self._syn(self.pyr[cid]["dend"], 0.05, nmda=p.mf_nmda), p.w_mf, p.d_mf)
+                w_mf = p.w_mf * (p.mf_scale_5ht if cid in PATTERNS[MOD_PATTERN["5-HT"]] else 1.0)
+                self._nc(self.dg[k]["soma"], self._syn(self.pyr[cid]["dend"], 0.05, nmda=p.mf_nmda), w_mf, p.d_mf)
                 # one synapse per connection: a shared TM synapse would let the first spike deplete it for all cells
                 ec_syn = self._syn(self.ec[k]["soma"], 0.5, nmda=False, stp=(0.9, 1.0, 1500.0))
                 self._nc(self.pyr[cid]["soma"], ec_syn, p.w_ce_total / len(cells), p.d_ce)

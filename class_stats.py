@@ -14,6 +14,7 @@ In B7 the twins also differ in presentation count: X and ‖ are presented 3 tim
 Reads results/layout_B/seeds/pilot_s{seed}{suffix}.pkl (run_pilot.py with TINYCA3_LAYOUT=B). For every condition
 found, reports W = mean 1 + Tt + z per class at 0.5, 1, 2, 4 and 8 h (mean and range over seeds), and draws
 Figure B1. Writes results/layout_B/class_stats.json and results/layout_B/fig_B1_classes.png.
+With --mf-5ht x it reads the runs with a weaker mossy-fibre drive onto the + cells (suffix _mf<x>, before _girk).
 With --girk it reads the runs with the 5-HT1A -> Kir3 current (run_pilot.py --ht-girk, suffix _girk) and writes
 class_stats_girk.json and fig_B1_classes_girk.png.
 Usage: TINYCA3_LAYOUT=B .venv/bin/python class_stats.py   (or TINYCA3_LAYOUT=B7: results/layout_B7)
@@ -77,8 +78,9 @@ def final_weight(d):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--girk", action="store_true", help="runs with the 5-HT GIRK current (suffix _girk)")
+    ap.add_argument("--mf-5ht", type=float, default=1.0, help="runs with a weaker drive onto the + cells (suffix _mf<x>)")
     args = ap.parse_args()
-    tag = "_girk" if args.girk else ""
+    tag = (f"_mf{args.mf_5ht:g}" if args.mf_5ht != 1.0 else "") + ("_girk" if args.girk else "")
     if not BASIC_DISJOINT:
         raise SystemExit(f"layout {LAYOUT}: synapse classes need disjoint basic patterns (use TINYCA3_LAYOUT=B)")
     runs = {c: [d for d in (load(sd, suf) for sd in SEEDS) if d is not None] for c, suf in ((c, suf + tag) for c, suf in COND.items())}

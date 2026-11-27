@@ -81,11 +81,13 @@ def main():
     ap.add_argument("--ht-girk", type=float, default=0.0,
                     help="5-HT1A -> Kir3 (GIRK) conductance (S/cm2) on the pyramidal cells 5-HT reaches, on while 5-HT "
                          "is present; 6e-5 gives the measured 4.3 mV hyperpolarization (neuron/ch_GIRK.mod, Johnston et al. 2014). 0 = off")
+    ap.add_argument("--mf-5ht", type=float, default=1.0,
+                    help="mossy-fibre weight onto the 5-HT cells x this (weaker encoding of +; 1 = calibrated drive)")
     ap.add_argument("--no-stc", action="store_true",
                     help="STP only: P1 synapses with plastic = 0 (no tag, no capture), everything else unchanged")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    cp, sp = CircuitParams(seed=args.seed), STCParams(alpha_P=0.0 if args.prp_block else 1.0,
+    cp, sp = CircuitParams(seed=args.seed, mf_scale_5ht=args.mf_5ht), STCParams(alpha_P=0.0 if args.prp_block else 1.0,
                                                          tau_G_min=args.gate)
     circ = Circuit(cp)
     n = len(circ.p1)
@@ -216,6 +218,8 @@ def main():
             suffix = f"_gate{args.gate:g}" + suffix
         if args.mod_min != 60.0:
             suffix = f"_mod{args.mod_min:g}" + suffix
+        if args.mf_5ht != 1.0:
+            suffix += f"_mf{args.mf_5ht:g}"
         if args.ht_girk > 0:
             suffix += "_girk"
         name = OUT / "seeds" / f"pilot_s{args.seed}{suffix}.pkl"
@@ -225,7 +229,7 @@ def main():
                              slow_Tt=slow["Tt"], slow_z=slow["z"], slow_P=np.array(slow["P"]),
                              slow_G=np.array(slow["G"]), gate=args.gate, events=events,
                              z_final=z, Tt_final=Tt, snapshots=snapshots, masks=masks,
-                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min, ht_girk=args.ht_girk,
+                             p1_pre=circ.p1_pre, p1_post=circ.p1_post, params=cp.__dict__, no_stc=args.no_stc, prp_block=args.prp_block, mod_min=args.mod_min, ht_girk=args.ht_girk, mf_5ht=args.mf_5ht,
                              probes=probes, probe_pairs=PROBES, U=float(circ.p1[0][2].U)), f)
         print("saved", name)
         return
