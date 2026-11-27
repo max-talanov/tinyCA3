@@ -166,9 +166,10 @@ replayed; (d)–(g) one replay event per epoch.
 
 Open points:
 
-- [ ] Replay as depression contradicts the common view that replay consolidates. Check the calcium of a replay spike
+- [x] Replay as depression contradicts the common view that replay consolidates. Check the calcium of a replay spike
   pair against the potentiation and depression thresholds of the tag rule, and decide whether replay should be able to
-  potentiate.
+  potentiate. Done ([report](REPLAY_DEPRESSION_2026-11-27.md)): replay calcium peaks at 2.0, below θ_p = 3, so a
+  second presynaptic spike can only depress; the decision is still open.
 - [ ] Use more seeds for the replay asymmetry: in seed 1 + replays first and X last, and this sets the order of the
   classes at 8 h.
 - [ ] Background activity between events (no spikes are simulated offline) would show whether the 5-HT difference
